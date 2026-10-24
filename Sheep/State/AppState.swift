@@ -21,6 +21,7 @@ final class AppState {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         load()
+        scrollMonitor.attach(self)
     }
 
     func setMode(_ newMode: Mode) {
