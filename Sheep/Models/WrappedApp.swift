@@ -39,5 +39,5 @@ enum WrappedApp: String, Codable, CaseIterable, Identifiable {
 
 /// Coarse section of a wrapped app, derived from the URL path. Never the content.
 enum AppSection: String, Codable {
-    case feed, reels, dms, shorts
+    case feed, reels, explore, dms, shorts
 }

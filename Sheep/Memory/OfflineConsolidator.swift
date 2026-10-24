@@ -81,6 +81,7 @@ enum MemoryText {
     static func sectionName(_ s: AppSection) -> String {
         switch s {
         case .reels: "Reels"
+        case .explore: "Explore"
         case .shorts: "Shorts"
         case .dms: "DMs"
         case .feed: "feed"
@@ -91,6 +92,7 @@ enum MemoryText {
     static func shortPlace(_ app: WrappedApp?, _ section: AppSection?) -> String {
         switch section {
         case .reels: "Reels"
+        case .explore: "Explore"
         case .shorts: "Shorts"
         case .dms: "DMs"
         case .feed, .none: "the \(app?.title ?? "") feed".replacingOccurrences(of: "the  feed", with: "the feed")

@@ -155,6 +155,7 @@ enum NudgePrompt {
         switch section {
         case .feed: "the \(app.title) feed"
         case .reels: "Reels"
+        case .explore: "Explore"
         case .shorts: "Shorts"
         case .dms: "\(app.title) DMs"
         }
@@ -164,6 +165,7 @@ enum NudgePrompt {
         switch section {
         case .feed: "the feed"
         case .reels: "Reels"
+        case .explore: "Explore"
         case .shorts: "Shorts"
         case .dms: "DMs"
         }

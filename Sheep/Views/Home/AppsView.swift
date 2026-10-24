@@ -104,7 +104,7 @@ enum AppsCaption {
     /// Representative paths for the sections Sheep can hide.
     static func probes(for app: WrappedApp) -> [(AppSection, String)] {
         switch app {
-        case .instagram: [(.reels, "/reels/"), (.dms, "/direct/inbox/")]
+        case .instagram: [(.reels, "/reels/"), (.explore, "/explore/"), (.dms, "/direct/inbox/")]
         case .youtube: [(.shorts, "/shorts/")]
         }
     }

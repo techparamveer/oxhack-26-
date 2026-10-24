@@ -19,6 +19,7 @@ import WebKit
 /// | `-sheepWrapperPath /reels/` | Every time a wrapper is presented, navigates it to this path (policy applies). |
 /// | `-sheepSimulateScroll <seconds>` | Every time a wrapper is presented, feeds that many seconds of synthetic feed scrolling into `ScrollMonitor`. |
 /// | `-sheepAppearance dark\|light` | Overrides the interface style for every window. |
+/// | `-sheepOpenHiddenByMode [focus\|rest\|play]` | Opens Settings on the Hidden-by-mode screen (optional mode). |
 /// | `-sheepRunConsolidator` | (existing, `DailyRollover`) forces a consolidator run. |
 enum DebugLaunch {
     /// `-sheepOffline`: no Gemini / Supabase traffic, every prompt returns its fallback.
@@ -64,6 +65,19 @@ enum DebugLaunchHooks {
 
     static func has(_ flag: String) -> Bool { args.contains(flag) }
 
+    /// `-sheepOpenHiddenByMode [focus|rest|play]`: Settings opens on Hidden by mode, optional mode selected.
+    nonisolated static var openHiddenByMode: Mode? {
+        let args = ProcessInfo.processInfo.arguments
+        guard args.contains("-sheepOpenHiddenByMode") else { return nil }
+        if let i = args.firstIndex(of: "-sheepOpenHiddenByMode"), args.indices.contains(i + 1) {
+            let raw = args[i + 1]
+            if !raw.hasPrefix("-"), let mode = Mode(rawValue: raw), Mode.selectable.contains(mode) {
+                return mode
+            }
+        }
+        return .focus
+    }
+
     /// Value following `flag` (`-sheepOpenWrapper instagram` → "instagram").
     static func value(_ flag: String) -> String? {
         guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
@@ -88,6 +102,12 @@ enum DebugLaunchHooks {
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 400_000_000)
                 router.push(.homeScreenIcons)
+            }
+        }
+        if has("-sheepOpenHiddenByMode") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                router.showSettings = true
             }
         }
         if DebugLaunch.isOffline { print("[Debug] -sheepOffline: Gemini + Supabase disabled, using fallbacks") }

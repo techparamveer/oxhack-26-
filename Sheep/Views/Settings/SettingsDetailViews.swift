@@ -17,18 +17,46 @@ struct PomodoroLengthView: View {
     }
 }
 
-/// Sections hidden in the wrappers while Focus is on.
-struct BlockedInFocusView: View {
+/// Sections hidden in the wrappers, per mode (Focus / Rest / Play).
+struct HiddenByModeView: View {
     @State private var settings = SheepSettings.shared
+    @State private var mode: Mode = .focus
 
     var body: some View {
-        SettingsDetail(title: "Blocked in Focus", footer: "Hidden inside Sheep's Instagram and YouTube while you focus.") {
+        SettingsDetail(title: "Hidden by mode", footer: footer) {
             ForEach(Array(SheepSettings.blockableSections.enumerated()), id: \.element) { index, section in
                 if index > 0 { RowDivider() }
-                CheckRow(title: SheepSettings.sectionTitle(section), isOn: settings.isBlocked(section)) {
-                    settings.toggleBlocked(section)
+                CheckRow(title: SheepSettings.sectionTitle(section),
+                         isOn: settings.isBlocked(section, in: mode)) {
+                    settings.toggleBlocked(section, in: mode)
                 }
+                .accessibilityIdentifier("hiddenByMode.section.\(section.rawValue)")
             }
+        } header: {
+            HStack {
+                Spacer(minLength: 0)
+                ModeSegmented(selection: $mode)
+                Spacer(minLength: 0)
+            }
+            .padding(.bottom, Theme.space(2))
+        }
+        .onAppear {
+            #if DEBUG
+            if let launched = DebugLaunchHooks.openHiddenByMode { mode = launched }
+            #endif
+        }
+    }
+
+    private var footer: String {
+        switch mode {
+        case .focus:
+            "Hidden inside Sheep's Instagram and YouTube while you focus."
+        case .rest:
+            "Hidden inside Sheep's Instagram and YouTube while you rest. DMs stay open so you can talk to friends."
+        case .play:
+            "Play hides nothing by default."
+        case .idle:
+            ""
         }
     }
 }
@@ -47,16 +75,27 @@ struct MutedWorkAppsView: View {
     }
 }
 
-/// Shared chrome for the Settings detail pickers: one white group + footer note.
-private struct SettingsDetail<Content: View>: View {
+/// Shared chrome for the Settings detail pickers: optional header + one white group + footer note.
+private struct SettingsDetail<Content: View, Header: View>: View {
     let title: String
     var footer: String?
     @ViewBuilder var content: () -> Content
+    @ViewBuilder var header: () -> Header
+
+    init(title: String, footer: String? = nil,
+         @ViewBuilder content: @escaping () -> Content,
+         @ViewBuilder header: @escaping () -> Header) {
+        self.title = title
+        self.footer = footer
+        self.content = content
+        self.header = header
+    }
 
     var body: some View {
         Screen(title: title) {
           ScrollView {
             VStack(alignment: .leading, spacing: Theme.space(1)) {
+                header()
                 Surface(padding: EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)) {
                     VStack(spacing: 0) { content() }
                 }
@@ -73,6 +112,12 @@ private struct SettingsDetail<Content: View>: View {
           // Cards use the 16 pt card margin inside Screen's 24 pt.
           .padding(.horizontal, Theme.cardMargin - Theme.margin)
         }
+    }
+}
+
+extension SettingsDetail where Header == EmptyView {
+    init(title: String, footer: String? = nil, @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, footer: footer, content: content, header: { EmptyView() })
     }
 }
 
