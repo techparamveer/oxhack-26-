@@ -17,6 +17,7 @@ struct DevMenuView: View {
                     Toggle(isOn: $state.fastTimers) {
                         Text("fast timers").font(Theme.body).foregroundStyle(Theme.text)
                     }
+                    .tint(Theme.focusAccent)   // same tint as Settings' toggles
                     Hairline()
                     TextButton(title: "seed yesterday", color: Theme.text) {
                         DevActions.seedYesterday(state: state)
