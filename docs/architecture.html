@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sheep — how it all works</title>
+<style>
+:root{
+  --fog:#ECEDEB; --wool:#FFFFFF; --ink:#17191A; --body:#4A4D4B; --sec:#6E726F; --ter:#8B8F8C;
+  --outline:#CFD2CE; --hair:#DCDEDA; --up:#2E7D5B; --down:#B4442E;
+  --focus:#3D5AFE; --rest:#2E7D5B; --play:#E8A93B;
+  --font: "Nunito", ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --fog:#0E0F0E; --wool:#1A1C1B; --ink:#F2F2EE; --body:#C4C7C4; --sec:#8B8F8C; --ter:#6E726F;
+         --outline:#2C2F2D; --hair:#242725; --up:#4FAF84; --down:#D2654D; }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font);font-weight:500;color:var(--ink)}
+.page{background:var(--fog);border-radius:24px;padding:24px 20px 28px;}
+h1{font-size:34px;font-weight:900;letter-spacing:-.03em;margin:0 0 4px}
+h2{font-size:24px;font-weight:900;letter-spacing:-.02em;margin:0 0 6px}
+h3{font-size:17px;font-weight:800;margin:18px 0 6px}
+p{line-height:1.5;margin:6px 0;color:var(--body);font-size:15.5px}
+.lede{font-size:16.5px;color:var(--body);max-width:62ch}
+.cap{font-size:12.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sec)}
+section{margin-top:34px}
+section > .cap{display:block;margin-bottom:4px}
+.nav{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0}
+.nav a,.chip{font:inherit;font-size:14px;font-weight:700;color:var(--ink);text-decoration:none;border:1.5px solid var(--outline);border-radius:999px;padding:6px 12px;background:transparent;cursor:pointer}
+.chip.on{border:2.5px solid var(--ink);padding:5px 11px;background:var(--wool)}
+.chip[data-m=focus].on{border-color:var(--focus)} .chip[data-m=rest].on{border-color:var(--rest)} .chip[data-m=play].on{border-color:var(--play)}
+.surface{background:var(--wool);border-radius:24px;padding:18px 20px}
+.hair{height:1px;background:var(--hair);margin:14px 0}
+a.f{font-family:var(--mono);font-size:12.5px;color:var(--ink);text-decoration:none;border-bottom:1px solid var(--outline);font-weight:400}
+a.f:hover{border-color:var(--ink)}
+code{font-family:var(--mono);font-size:12.5px;font-weight:400}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+svg{width:100%;height:auto;display:block}
+svg text{font-family:var(--font);fill:var(--ink)}
+.node rect{fill:var(--wool);stroke:var(--outline);stroke-width:1.5}
+.node{cursor:pointer}
+.node:hover rect,.node.sel rect{stroke:var(--ink);stroke-width:2.5}
+.node .t{font-size:12.5px;font-weight:800}
+.node .s{font-size:10.5px;font-weight:600;fill:var(--sec)}
+.group{fill:none;stroke:var(--outline);stroke-width:1.5;stroke-dasharray:2 4}
+.glabel{font-size:11px;font-weight:800;letter-spacing:.08em;fill:var(--sec)}
+.edge{fill:none;stroke:var(--ink);stroke-width:1.6}
+.edge.async{stroke:var(--sec);stroke-dasharray:5 4}
+.edge.back{stroke:var(--focus);stroke-dasharray:3 3}
+.elabel{font-size:10px;font-weight:800;fill:var(--sec)}
+.off .net{opacity:.25}
+.off .edge.net{stroke:var(--down)}
+.off .fbnode rect{stroke:var(--up);stroke-width:2.5}
+.detail{margin-top:12px;min-height:76px}
+.detail .ttl{font-weight:800;font-size:16px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 0;font-size:13px;color:var(--sec);font-weight:700;align-items:center}
+.legend svg{width:34px;height:10px;display:inline-block;vertical-align:middle;margin-right:6px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--sec);text-align:left;padding:8px 8px;border-bottom:1px solid var(--hair)}
+td{padding:9px 8px;border-bottom:1px solid var(--hair);vertical-align:top;color:var(--body);line-height:1.4}
+td:first-child{color:var(--ink);font-weight:700}
+td.blk{color:var(--down);font-weight:800}
+td.ok{color:var(--ink)}
+.hl{outline:2.5px solid var(--ink);outline-offset:-2.5px;border-radius:8px}
+.scroll{overflow-x:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{background:var(--wool);border-radius:20px;padding:14px 16px}
+.card .ttl{font-weight:800;font-size:15.5px;margin-bottom:4px}
+.card p{font-size:14px;margin:4px 0}
+details{background:var(--wool);border-radius:20px;padding:12px 16px;margin:8px 0}
+summary{cursor:pointer;font-weight:800;font-size:15.5px;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";float:right;color:var(--sec);font-weight:800}
+details[open] summary::after{content:"–"}
+details ul{margin:8px 0 2px;padding-left:18px;color:var(--body);font-size:14px;line-height:1.5}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.col{background:var(--wool);border-radius:16px;padding:10px 12px;font-size:13.5px;color:var(--body);line-height:1.45;min-height:96px}
+.col .cap{display:block;margin-bottom:4px}
+.steps{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.steps button{font:inherit;font-weight:800;font-size:14px;width:34px;height:34px;border-radius:50%;border:1.5px solid var(--outline);background:transparent;color:var(--ink);cursor:pointer}
+.steps button.on{background:var(--ink);color:var(--fog);border-color:var(--ink)}
+.btn{font:inherit;font-weight:800;font-size:15px;border:0;border-radius:999px;padding:10px 18px;background:var(--focus);color:#fff;cursor:pointer}
+.tbtn{font:inherit;font-weight:700;font-size:15px;border:0;background:none;color:var(--body);cursor:pointer;padding:10px 8px}
+.bar{display:flex;height:30px;border-radius:999px;overflow:hidden;border:1.5px solid var(--outline);margin:10px 0 4px;background:var(--wool)}
+.bar div{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;color:#fff}
+.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--sec);font-weight:700}
+.status{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.status .card{border-left:0}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:2px 8px;border:1.5px solid}
+.pill.done{color:var(--up);border-color:var(--up)} .pill.part{color:#a8740f;border-color:var(--play)} .pill.miss{color:var(--down);border-color:var(--down)} .pill.unv{color:var(--sec);border-color:var(--outline)}
+@media (prefers-color-scheme: dark){ .pill.part{color:var(--play)} }
+.warn{border:1.5px solid var(--down);border-radius:16px;padding:10px 14px;margin:10px 0;color:var(--body);font-size:14.5px;line-height:1.45}
+.warn b{color:var(--down)}
+.diff{font-size:14px;color:var(--body);line-height:1.5;margin:0;padding-left:18px}
+.gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px 18px;margin-top:10px}
+.gloss div{font-size:13.5px;color:var(--body);line-height:1.4}
+.gloss b{color:var(--ink);font-weight:800}
+</style>
+</head>
+<body>
+<div class="page">
+  <span class="cap">OxHack '26 · theme: time · main @ e0bacca</span>
+  <h1>How Sheep works</h1>
+  <p class="lede">Your time has modes. In <b style="color:var(--focus)">Focus</b>, <b style="color:var(--rest)">Rest</b> and <b style="color:#b07a14">Play</b>, the same Instagram and YouTube behave differently. Gemini plans your sessions and taps you on the shoulder when you doom-scroll. Sheep keeps a memory diary so it can say “yesterday you…”. Everything runs on the phone, and a Supabase backend quietly backs it up.</p>
+  <div class="nav">
+    <a href="#map">System map</a><a href="#front">Frontend</a><a href="#policy">Mode policy</a><a href="#back">Backend</a><a href="#ai">AI + memory</a><a href="#walk">Demo walkthrough</a><a href="#status">Status</a>
+  </div>
+  <div class="gloss">
+    <div><b>Wrapper</b>: Instagram/YouTube's mobile website shown inside Sheep's own browser view, so Sheep can see the page path (never the content).</div>
+    <div><b>Fallback</b>: hand-written text used when Gemini can't answer within 3 s. The demo never waits on Wi-Fi.</div>
+    <div><b>Fire-and-forget</b>: data is put in a background queue; the screen never waits for it.</div>
+    <div><b>RLS</b>: database rules that let each user see only their own rows.</div>
+    <div><b>Edge Function</b>: a tiny server function on Supabase; ours forwards prompts to Gemini so the key stays off the phone.</div>
+    <div><b>Anonymous auth</b>: each install gets a private user id with no sign-up form.</div>
+  </div>
+
+  <!-- 1. SYSTEM MAP -->
+  <section id="map">
+    <span class="cap">1 · system map</span>
+    <h2>Phone first, cloud second</h2>
+    <p>Tap any box. Turn on <b>offline</b> to see what keeps working.</p>
+    <div style="display:flex;gap:8px;margin:8px 0">
+      <button class="chip on" id="onBtn">online</button><button class="chip" id="offBtn">offline / no config</button>
+    </div>
+    <div class="surface" style="padding:12px">
+      <svg id="sys" viewBox="0 0 720 450" role="img" aria-label="System map"></svg>
+    </div>
+    <div class="legend">
+      <span><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="2"/></svg>synchronous: the screen waits, bounded by the 3 s timeout</span>
+      <span><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="2" stroke-dasharray="5 4"/></svg>fire-and-forget: background only</span>
+    </div>
+    <div class="surface detail" id="sysDetail"><div class="ttl">Pick a box</div><p>Each box links to the file that implements it.</p></div>
+  </section>
+
+  <!-- 2. FRONTEND -->
+  <section id="front">
+    <span class="cap">2 · frontend</span>
+    <h2>Screens and how you move between them</h2>
+    <p>One <code>NavigationStack</code> driven by <a class="f" data-p="Sheep/State/Router.swift">Router.path</a> (<code>Route</code> = focusIntake · focusSession · congrats · rest · play · notebook · setup · notebookFile). Wrappers open full-screen and Settings and Dev are sheets. <b>Every screen is real</b>: <code>Sheep/Views/Placeholders/</code> is gone from main.</p>
+    <div class="surface" style="padding:12px">
+      <svg id="navsvg" viewBox="0 0 720 400" role="img" aria-label="Navigation map"></svg>
+    </div>
+    <div class="legend">
+      <span><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="2"/></svg>push / present</span>
+      <span style="color:var(--focus)"><svg viewBox="0 0 34 10"><line x1="0" y1="5" x2="34" y2="5" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/></svg>nudge “back to focus”</span>
+    </div>
+    <div class="surface detail" id="navDetail"><div class="ttl">Pick a screen</div><p>Rules: one mode at a time; a running Focus is never ended from Home (the button becomes “Back to focus”); starting Rest/Play ends the other one cleanly first.</p></div>
+
+    <h3>Shared building blocks</h3>
+    <div class="grid">
+      <div class="card"><div class="ttl">Theme</div><p>Nunito with an explicit weight (never thin, min 400), Paper type scale, foggy-field palette with a dark-mode twin, mode accents, 24 pt margins.</p><a class="f" data-p="Sheep/Design/Theme.swift">Design/Theme.swift</a></div>
+      <div class="card"><div class="ttl">Components</div><p>PrimaryButton (one per screen), TextButton, Hairline, ModeDot, SectionLabel, Surface (white, radius 24), IconCircleButton, Screen.</p><a class="f" data-p="Sheep/Views/Components/Components.swift">Components.swift</a></div>
+      <div class="card"><div class="ttl">SheepView</div><p>One pose per mode: awake, reading (focus), sleeping (rest). Play has <b>no art yet</b> and shows awake. Wool puffs for stages 0–4, and wool falls off when XP drops.</p><a class="f" data-p="Sheep/Views/SheepView.swift">Views/SheepView.swift</a></div>
+      <div class="card"><div class="ttl">AppState</div><p>Mode, XP, running Focus/Rest/Play sessions, last congrats, fast-timers flag. Saved as JSON in UserDefaults. Owns the ScrollMonitor.</p><a class="f" data-p="Sheep/State/AppState.swift">State/AppState.swift</a></div>
+    </div>
+  </section>
+
+  <!-- 3. POLICY -->
+  <section id="policy">
+    <span class="cap">3 · mode policy</span>
+    <h2>Same apps, different rules</h2>
+    <p>Read from <a class="f" data-p="Sheep/State/Policy.swift">Policy.swift</a> and <a class="f" data-p="Sheep/Services/ScrollMonitor.swift">ScrollMonitor.threshold</a>. Pick a mode:</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0" id="modeChips">
+      <button class="chip on" data-m="focus">Focus</button><button class="chip" data-m="rest">Rest</button><button class="chip" data-m="play">Play</button><button class="chip" data-m="idle">Idle</button>
+    </div>
+    <div class="surface scroll">
+      <table id="ptable">
+        <thead><tr><th>Section</th><th data-c="focus">Focus</th><th data-c="rest">Rest</th><th data-c="play">Play</th><th data-c="idle">Idle</th></tr></thead>
+        <tbody>
+          <tr><td>Instagram feed</td><td data-c="focus">allowed · nudge at 30 s fast / 3 min</td><td data-c="rest">allowed · nudge at 2 min fast / 30 min</td><td data-c="play">allowed, never nudged</td><td data-c="idle">allowed, never nudged</td></tr>
+          <tr><td>Instagram Reels</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed · nudged</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
+          <tr><td>Instagram DMs</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed (open)</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
+          <tr><td>YouTube feed</td><td data-c="focus">allowed · nudged</td><td data-c="rest">allowed · nudged</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
+          <tr><td>YouTube Shorts</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed · nudged</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
+          <tr><td>Teams · Outlook · Slack</td><td data-c="focus">—</td><td data-c="rest">shown “muted”†</td><td data-c="play">shown “muted”†</td><td data-c="idle">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p id="policyNote"></p>
+    <p style="font-size:13.5px">* Default; can be unticked in Settings → “Blocked in Focus”. The feed can never be blocked. Blocking works on the <b>URL path</b> (<code>/reels/</code>, <code>/reel/…</code>, <code>/&lt;user&gt;/reels/</code>, <code>/direct/</code>, <code>/shorts/</code>) both on full page loads and on in-page (single-page-app) navigations reported by <a class="f" data-p="Sheep/Wrapper/inject.js">inject.js</a>. Hiding CSS only removes the links cosmetically. † Display only: real muting is the user's own iOS Focus, switched on by a Shortcut (<a class="f" data-p="Sheep/Views/SetupView.swift">SetupView</a>). Nudge cooldown 2 min. Outcome is “returned” (+15 XP) if you tap a leaving button, open DMs or leave the wrapper within 60 s, otherwise “ignored” (−10 XP, wool sheds).</p>
+  </section>
+
+  <!-- 4. BACKEND -->
+  <section id="back">
+    <span class="cap">4 · backend</span>
+    <h2>Supabase: backup + Gemini proxy</h2>
+    <div class="warn"><b>Not deployed yet.</b> On 24 Oct, an unauthenticated <code>POST https://wfrlvenjytnowvjuzgom.supabase.co/functions/v1/gemini</code> returned <code>404 NOT_FOUND · "Requested function was not found"</code>. The Supabase MCP had no permission for list_tables, list_migrations or list_edge_functions, so whether the tables and migration exist is <b>unverified</b>.</div>
+    <h3>Tables · <a class="f" data-p="supabase/migrations/20261024171408_sheep_backend.sql">migrations/20261024171408_sheep_backend.sql</a></h3>
+    <p>All five tables: RLS on, policies only <code>to authenticated</code> with <code>(select auth.uid()) = user_id</code>, <code>anon</code> gets nothing, <code>user_id</code> defaults to <code>auth.uid()</code>, rows cascade-delete with the user.</p>
+    <details><summary>events <span class="cap" style="margin-left:6px">select · insert</span></summary><ul><li><code>id</code> bigint identity PK · <code>user_id</code> uuid → auth.users · <code>client_id</code> uuid · <code>ts</code> timestamptz · <code>type</code> text (1–40) · <code>payload</code> jsonb · <code>created_at</code></li><li>unique (user_id, client_id) makes retries idempotent; index (user_id, ts desc)</li><li>Append-only: no update or delete grants. Mirror of <code>events.jsonl</code>, never DM or post content.</li></ul></details>
+    <details><summary>memory_files <span class="cap" style="margin-left:6px">select · insert · update · delete</span></summary><ul><li>PK (user_id, path) · <code>content</code> text ≤ 200,000 chars · <code>updated_at</code></li><li>One row per markdown memory file; latest write wins.</li></ul></details>
+    <details><summary>sessions <span class="cap" style="margin-left:6px">select · insert · update</span></summary><ul><li><code>mode</code> (idle/focus/rest/play) · <code>title</code> · <code>planned_min</code> · <code>actual_min</code> · <code>done</code> · <code>total</code> · <code>xp</code> · <code>started_at</code> · <code>ended_at</code>; unique (user_id, client_id)</li><li>⚠️ Only Focus sessions create rows today (paired from session_start → session_end). Rest/Play only reach <code>events</code>.</li></ul></details>
+    <details><summary>daily_scores <span class="cap" style="margin-left:6px">select · insert · update</span></summary><ul><li>PK (user_id, date) · <code>score</code>, <code>focus</code>, <code>rest</code>, <code>play</code> · <code>updated_at</code></li><li>Written from Home, debounced 2 s (<a class="f" data-p="Sheep/Services/Supabase/DailyScoreSync.swift">DailyScoreSync</a>).</li></ul></details>
+    <details><summary>gemini_calls + consume_gemini_quota() <span class="cap" style="margin-left:6px">select · insert · delete old</span></summary><ul><li>One row per proxied call. You can only delete your own rows <b>older than a day</b>, so you can't reset your own quota.</li><li><code>consume_gemini_quota(per_minute 30, per_day 500)</code>: security invoker (RLS still applies), per-user advisory lock, prunes rows older than 2 days. Callers can only lower the limits. Execute is granted to <code>authenticated</code> only.</li></ul></details>
+
+    <h3>Edge Function “gemini” · <a class="f" data-p="supabase/functions/gemini/handler.ts">functions/gemini/handler.ts</a></h3>
+    <div class="grid">
+      <div class="card"><div class="ttl">1 · JWT</div><p><code>verify_jwt = true</code>: only signed-in (anonymous) users get in.</p></div>
+      <div class="card"><div class="ttl">2 · validate</div><p>POST only. 503 if the <code>GEMINI_API_KEY</code> secret is missing, 413 over 256 KB, 400 if <code>contents</code> is missing.</p></div>
+      <div class="card"><div class="ttl">3 · Flash allowlist</div><p>gemini-flash-latest, flash-lite-latest, 2.5-flash(-lite), 2.0-flash(-lite), 3-flash-preview. Anything else → 400.</p></div>
+      <div class="card"><div class="ttl">4 · quota</div><p>Calls <code>rpc/consume_gemini_quota</code> with the caller's JWT (3 s). RPC failure → 503, over the limit → 429.</p></div>
+      <div class="card"><div class="ttl">5 · forward</div><p>Sends only contents, systemInstruction and generationConfig upstream with the secret key. 15 s timeout → 504; network error → 502; Gemini's status passes through.</p></div>
+    </div>
+
+    <h3>Swift side · <a class="f" data-p="Sheep/Services/Supabase/SupabaseSync.swift">Services/Supabase/</a></h3>
+    <div class="grid">
+      <div class="card"><div class="ttl">Auth</div><p>Anonymous sign-up, token refresh, session kept in UserDefaults. A revoked token gets a new anonymous user; failed sign-ups back off 60 s.</p><a class="f" data-p="Sheep/Services/Supabase/SupabaseAuth.swift">SupabaseAuth.swift</a></div>
+      <div class="card"><div class="ttl">Hooks</div><p><code>EventLog.append</code> → events (+ a sessions row on session_end) · <code>MemoryStore.write/delete</code> → memory_files · Home score → daily_scores.</p><a class="f" data-p="Sheep/Services/Supabase/SupabaseSync.swift">SupabaseSync.swift</a></div>
+      <div class="card"><div class="ttl">Retry queue</div><p>A JSON file on disk. Coalesces by key, sends up to 50 per batch, backs off 2 s → 10 min. Network/auth failures are never dropped; bad rows are dropped after 12 tries; capped at 1,000 ops.</p><a class="f" data-p="Sheep/Services/Supabase/SyncQueue.swift">SyncQueue.swift</a></div>
+      <div class="card"><div class="ttl">Offline memory</div><p>After a connectivity error, every Supabase call fails instantly for 15 s, so nothing waits on the radio.</p><a class="f" data-p="Sheep/Services/Supabase/SupabaseAuth.swift">SupabaseTransport</a></div>
+    </div>
+
+    <h3>GeminiClient order: proxy → dev key → fallback</h3>
+    <p>Every prompt has a single hard deadline (3 s; consolidator 15 s), enforced by <a class="f" data-p="Sheep/Services/Deadline.swift">withDeadline</a>. Pick a situation:</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap" id="gchips">
+      <button class="chip on" data-s="0">ideal: deployed</button><button class="chip" data-s="1">today: fn 404 + dev key</button><button class="chip" data-s="2">key 403 blocked</button><button class="chip" data-s="3">Wi-Fi off</button><button class="chip" data-s="4">nothing configured</button>
+    </div>
+    <div class="surface" style="margin-top:10px">
+      <div class="bar" id="gbar"></div>
+      <div class="ticks"><span>0 s</span><span>1 s</span><span>2 s</span><span>3 s budget</span></div>
+      <p id="gtext"></p>
+      <p style="font-size:13.5px">Source: <a class="f" data-p="Sheep/Services/GeminiClient.swift">GeminiClient.swift</a>. When a dev key exists, the proxy gets 60 % of the budget (1.8 s), then the direct call gets what's left (at least 0.5 s). Schemas are written lower-case and upper-cased for Gemini; the model defaults to <code>gemini-flash-latest</code>.</p>
+    </div>
+  </section>
+
+  <!-- 5. AI + MEMORY -->
+  <section id="ai">
+    <span class="cap">5 · ai + memory</span>
+    <h2>Six prompts, one memory</h2>
+    <p>Each prompt lives in <code>Sheep/Services/Prompts/</code>. Every prompt except the consolidator starts with the Sheep <a class="f" data-p="Sheep/Services/Prompts/Persona.swift">Persona</a> and gets <code>{{MEMORY}}</code>.</p>
+    <div id="prompts"></div>
+
+    <h3>The memory loop</h3>
+    <div class="surface" style="padding:12px"><svg id="memsvg" viewBox="0 0 720 330" role="img" aria-label="Memory loop"></svg></div>
+    <div class="surface detail" id="memDetail"><div class="ttl">How “yesterday you… lock in” happens</div><p>Yesterday's events are written into <code>timeline/daily/&lt;yesterday&gt;.md</code> at session end or on the first open of a new day. <code>MemoryContext.build</code> always puts a “Yesterday (Friday …)” block near the top of <code>{{MEMORY}}</code>, and the Persona tells Gemini to bring it up. Offline, <code>OfflineBrief.recapSentence</code> builds the same sentence straight from the raw events. Tap a step.</p></div>
+  </section>
+
+  <!-- 6. WALKTHROUGH -->
+  <section id="walk">
+    <span class="cap">6 · one demo run</span>
+    <h2>Follow the data</h2>
+    <div class="steps" id="steps"></div>
+    <div class="surface"><div class="ttl" id="wTitle" style="font-weight:800;font-size:17px"></div><p id="wBody"></p>
+      <div class="cols">
+        <div class="col"><span class="cap">screen</span><span id="wUI"></span></div>
+        <div class="col"><span class="cap">events.jsonl</span><span id="wEv"></span></div>
+        <div class="col"><span class="cap">memory files</span><span id="wMem"></span></div>
+        <div class="col"><span class="cap">supabase (background)</span><span id="wSup"></span></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center"><button class="btn" id="wNext">Next step</button><button class="tbtn" id="wPrev">back</button></div>
+    </div>
+  </section>
+
+  <!-- 7. STATUS -->
+  <section id="status">
+    <span class="cap">7 · status vs the mvp plan</span>
+    <h2>Where we are</h2>
+    <div class="status" id="statusGrid"></div>
+    <h3>Docs vs code</h3>
+    <ul class="diff">
+      <li>MVP_PLAN says the backend is “out of scope” and Gemini is called directly. In the code, Supabase is the default path and the direct key is a dev fallback. BUILD_PROMPT and CLAUDE.md were updated; MVP_PLAN wasn't.</li>
+      <li>BUILD_PROMPT gives Play accent #E07A2E and a “warm off-white” background. Code and Paper use #E8A93B and fog #ECEDEB.</li>
+      <li>BUILD_PROMPT's Theme sample uses weights 600/700. The real scale is 400–900 (no thin type).</li>
+      <li>MVP_PLAN treats feed and Reels differently in Rest (“lenient” vs “monitored”). Code uses one Rest threshold for every section.</li>
+      <li>Memory budget: docs say ~1.5k tokens, code caps at 6,000 characters (about the same).</li>
+      <li>Moving from the feed to Reels or Shorts does <b>not</b> count as “returned” after a nudge. Only leaving, opening DMs or tapping a leaving button does.</li>
+      <li>BUILD_PROMPT step 6 asks for a brief refresh button. There isn't one; the brief refreshes on rollover, seed and reset.</li>
+    </ul>
+    <p style="font-size:13px;margin-top:14px">Written companion: <a class="f" data-p="docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a> · 213 XCTest functions in <a class="f" data-p="SheepTests">SheepTests/</a> + Deno tests for the proxy.</p>
+  </section>
+</div>
+
+<script>
+const REPO = "https://github.com/techparamveer/oxhack-26-sheep/blob/main/";
+const link = (p, label) => `<a class="f" target="_blank" href="${REPO}${p}">${label || p}</a>`;
+document.querySelectorAll("a.f[data-p]").forEach(a => { a.href = REPO + a.dataset.p; a.target = "_blank"; });
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+
+function addMarker(svg, id, color) {
+  let defs = svg.querySelector("defs") || el("defs", {}, svg);
+  const m = el("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" }, defs);
+  el("path", { d: "M0,0 L10,5 L0,10 z", fill: color }, m);
+}
+function clip(n, tx, ty) { // point on rect border of n towards (tx,ty)
+  const cx = n.x + n.w / 2, cy = n.y + n.h / 2, dx = tx - cx, dy = ty - cy;
+  const sx = dx === 0 ? Infinity : (n.w / 2) / Math.abs(dx), sy = dy === 0 ? Infinity : (n.h / 2) / Math.abs(dy);
+  const s = Math.min(sx, sy); return [cx + dx * s, cy + dy * s];
+}
+function diagram(svg, nodes, edges, onPick, extraClass) {
+  const ink = getComputedStyle(document.body).color;
+  addMarker(svg, svg.id + "a", ink); addMarker(svg, svg.id + "g", "#8B8F8C"); addMarker(svg, svg.id + "f", "#3D5AFE");
+  const byId = {}; nodes.forEach(n => byId[n.id] = n);
+  const eg = el("g", {}, svg), ng = el("g", {}, svg);
+  edges.forEach(([a, b, kind, label, cls]) => {
+    const A = byId[a], B = byId[b];
+    const [x1, y1] = clip(A, B.x + B.w / 2, B.y + B.h / 2), [x2, y2] = clip(B, A.x + A.w / 2, A.y + A.h / 2);
+    const m = kind === "async" ? "g" : kind === "back" ? "f" : "a";
+    el("line", { x1, y1, x2, y2, class: "edge " + (kind || "") + " " + (cls || ""), "marker-end": `url(#${svg.id}${m})` }, eg);
+    if (label) { const t = el("text", { x: (x1 + x2) / 2 + 4, y: (y1 + y2) / 2 - 4, class: "elabel " + (cls || "") }, eg); t.textContent = label; }
+  });
+  nodes.forEach(n => {
+    const g = el("g", { class: "node " + (n.cls || ""), tabindex: 0 }, ng);
+    el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 12 }, g);
+    const t = el("text", { x: n.x + n.w / 2, y: n.y + (n.s ? n.h / 2 - 3 : n.h / 2 + 4), "text-anchor": "middle", class: "t" }, g); t.textContent = n.t;
+    if (n.s) { const s = el("text", { x: n.x + n.w / 2, y: n.y + n.h / 2 + 11, "text-anchor": "middle", class: "s" }, g); s.textContent = n.s; }
+    const pick = () => { ng.querySelectorAll(".node").forEach(x => x.classList.remove("sel")); g.classList.add("sel"); onPick(n); };
+    g.addEventListener("click", pick); g.addEventListener("keydown", e => { if (e.key === "Enter") pick(); });
+  });
+}
+const show = (box, n) => { box.innerHTML = `<div class="ttl">${n.t}</div><p>${n.d}</p>${n.f ? "<p>" + n.f.map(p => link(p, p.replace(/^Sheep\//, ""))).join(" · ") + "</p>" : ""}`; };
+
+/* ---------- 1. system map ---------- */
+const sys = document.getElementById("sys");
+el("rect", { x: 8, y: 8, width: 432, height: 434, rx: 20, class: "group" }, sys);
+el("text", { x: 24, y: 28, class: "glabel" }, sys).textContent = "IPHONE · SOURCE OF TRUTH";
+el("rect", { x: 458, y: 8, width: 254, height: 316, rx: 20, class: "group net" }, sys);
+el("text", { x: 474, y: 28, class: "glabel net" }, sys).textContent = "SUPABASE";
+const W = 186;
+const sysNodes = [
+  { id: "ui", x: 24, y: 42, w: W, h: 44, t: "SwiftUI screens", s: "Home · Focus · Rest · Play", d: "Every screen reads AppState and logs what happens to the EventLog. Nothing here waits on Supabase; only Gemini calls are awaited, always inside a 3 s budget.", f: ["Sheep/SheepApp.swift", "Sheep/State/AppState.swift"] },
+  { id: "wr", x: 240, y: 42, w: W, h: 44, t: "Wrappers + inject.js", s: "instagram.com · m.youtube.com", d: "WKWebView with a mobile Safari user agent and persistent cookies. inject.js reports only the URL path and scroll amounts every 5 s, never page content. Native blocks paths using Policy.", f: ["Sheep/Wrapper/WebView.swift", "Sheep/Wrapper/inject.js", "Sheep/Wrapper/WrapperNavigation.swift"] },
+  { id: "sm", x: 240, y: 116, w: W, h: 40, t: "ScrollMonitor", s: "streaks · thresholds · nudge", d: "Adds scroll samples up into streaks. When a streak passes the mode's threshold (Focus 30 s fast / 3 min), it calls the nudge prompt and shows InterventionOverlay. It logs scroll and nudge events and applies ±XP.", f: ["Sheep/Services/ScrollMonitor.swift"] },
+  { id: "el", x: 24, y: 116, w: W, h: 40, t: "EventLog", s: "memory/events.jsonl", d: "Append-only JSON lines: session_start/end, checklist_done, scroll, nudge, blocked, wrapper_open, mode_change, rest_activity, play_session. Each append is also queued for Supabase.", f: ["Sheep/Services/EventLog.swift"] },
+  { id: "mc", x: 24, y: 190, w: W, h: 40, t: "MemoryConsolidator", s: "session end · new day", d: "Reads events since the last run plus all memory files, asks Gemini (15 s) to rewrite them, or uses the deterministic OfflineConsolidator. Old versions are snapshotted to history/ first.", f: ["Sheep/Memory/MemoryConsolidator.swift", "Sheep/Memory/OfflineConsolidator.swift"] },
+  { id: "mem", x: 24, y: 262, w: W, h: 40, t: "Memory files", s: "profile · daily · patterns · workstreams", d: "Markdown with a YAML header (id, type, aliases, updated). You can read, edit and delete them in the Notebook tab.", f: ["Sheep/Memory/MemoryStore.swift", "Sheep/Memory/MemoryHeader.swift"] },
+  { id: "ctx", x: 24, y: 334, w: W, h: 40, t: "MemoryContext.build", s: "→ {{MEMORY}} ≤ 6,000 chars", d: "Profile, preferences, today, yesterday, three earlier days, active workstreams, top patterns and what-works, plus files whose aliases match the app or goal.", f: ["Sheep/Memory/MemoryContext.swift"] },
+  { id: "gc", x: 240, y: 334, w: W, h: 40, t: "GeminiClient", s: "3 s · consolidator 15 s", d: "Proxy first, then the direct dev key, then the hardcoded fallback, all inside one hard deadline. It always returns a value.", f: ["Sheep/Services/GeminiClient.swift", "Sheep/Services/Deadline.swift"] },
+  { id: "fb", x: 240, y: 398, w: W, h: 34, t: "Hardcoded fallbacks", cls: "fbnode", d: "Every prompt has offline copy that uses real numbers from the device (goal, minutes, yesterday's recap). With Wi-Fi off the whole demo still works.", f: ["Sheep/Services/Prompts/NudgePrompt.swift", "Sheep/Memory/DailyBriefService.swift"] },
+  { id: "q", x: 240, y: 226, w: W, h: 40, t: "SyncQueue", s: "sync/supabase-queue.json", d: "A persisted retry queue. Coalesces repeat writes, sends batches of up to 50, backs off up to 10 min, and keeps everything while offline.", f: ["Sheep/Services/Supabase/SyncQueue.swift", "Sheep/Services/Supabase/SupabaseSync.swift"] },
+  { id: "auth", x: 474, y: 42, w: 222, h: 40, t: "Auth · anonymous", s: "sign-up · refresh", cls: "net", d: "Each install gets an anonymous user. The JWT is sent with every request so RLS can scope rows.", f: ["Sheep/Services/Supabase/SupabaseAuth.swift"] },
+  { id: "fn", x: 474, y: 116, w: 222, h: 44, t: "Edge Function gemini", s: "JWT · Flash allowlist · quota", cls: "net", d: "Keeps the Gemini key server-side. ⚠️ Probe on 24 Oct returned 404: not deployed on wfrlvenjytnowvjuzgom.", f: ["supabase/functions/gemini/handler.ts"] },
+  { id: "rpc", x: 474, y: 190, w: 222, h: 40, t: "consume_gemini_quota", s: "30 / min · 500 / day", cls: "net", d: "A Postgres function run as the caller. Records one call or refuses with 429.", f: ["supabase/migrations/20261024171408_sheep_backend.sql"] },
+  { id: "db", x: 474, y: 262, w: 222, h: 44, t: "Postgres + RLS", s: "events · memory_files · sessions · scores", cls: "net", d: "Per-user backup. The device stays the source of truth; nothing is read back into the app today.", f: ["supabase/migrations/20261024171408_sheep_backend.sql"] },
+  { id: "gem", x: 474, y: 370, w: 222, h: 44, t: "Google Gemini API", s: "generateContent · JSON schema", cls: "net", d: "Flash model, JSON responses with a schema. The user reports the current key returns 403 API_KEY_SERVICE_BLOCKED until its API restrictions are fixed." }
+];
+const sysEdges = [
+  ["wr", "sm", "", "nav · scroll"], ["sm", "el"], ["ui", "el"], ["el", "mc"], ["mc", "mem"], ["mem", "ctx"], ["ctx", "gc"],
+  ["gc", "fn", "", "1 proxy", "net"], ["fn", "rpc", "", "", "net"], ["rpc", "db", "", "", "net"], ["fn", "gem", "", "", "net"],
+  ["gc", "gem", "", "2 dev key", "net"], ["gc", "fb", "", "3"],
+  ["el", "q", "async"], ["mem", "q", "async"], ["q", "db", "async", "flush", "net"], ["q", "auth", "async", "JWT", "net"], ["ui", "wr"]
+];
+const sysDetail = document.getElementById("sysDetail");
+diagram(sys, sysNodes, sysEdges, n => show(sysDetail, n));
+const setOff = off => {
+  sys.classList.toggle("off", off);
+  document.getElementById("offBtn").classList.toggle("on", off); document.getElementById("onBtn").classList.toggle("on", !off);
+  sysDetail.innerHTML = off
+    ? `<div class="ttl">Offline: everything on the left still works</div><p>With no network, <code>SupabaseTransport</code> fails fast and stays “offline” for 15 s. GeminiClient returns each fallback within its budget, the consolidator uses OfflineConsolidator, and sync ops wait on disk until the app comes back to the foreground. With no Supabase/Gemini config at all, fallbacks are instant and the sync hooks do nothing.</p>`
+    : `<div class="ttl">Online</div><p>Prompts go phone → Edge Function → Gemini. Events, memory files, sessions and the daily score flow to Postgres in the background.</p>`;
+};
+document.getElementById("onBtn").onclick = () => setOff(false);
+document.getElementById("offBtn").onclick = () => setOff(true);
+
+/* ---------- 2. navigation ---------- */
+const nw = 150, nh = 38;
+const navNodes = [
+  { id: "links", x: 545, y: 10, t: "sheep:// · App Intents", d: "<code>sheep://open/instagram|youtube</code> and <code>sheep://mode/focus|rest|play|idle</code>, plus StartModeIntent and OpenWrapperIntent in the Shortcuts app. They go through the same Router.handle and Home rules.", f: ["Sheep/State/Router.swift", "Sheep/Intents/SheepIntents.swift", "Sheep/Intents/IntentRouter.swift"] },
+  { id: "app", x: 285, y: 10, t: "RootView", d: "A single NavigationStack bound to router.path. Wrapper = fullScreenCover; Dev menu and Settings = sheets.", f: ["Sheep/SheepApp.swift"] },
+  { id: "dev", x: 20, y: 75, t: "Dev menu", s: "long-press sheep", d: "Fast timers (1-min Pomodoros, 30 s nudge), seed yesterday, run consolidator, reset all. Also shows whether Gemini goes via supabase, via key, or is “not configured”.", f: ["Sheep/Views/DevMenuView.swift"] },
+  { id: "tabs", x: 285, y: 75, t: "Floating tab bar", s: "Home · Apps · Notebook", d: "A white capsule shown only at the root; pushed screens cover it.", f: ["Sheep/Views/Home/TabBar.swift"] },
+  { id: "set", x: 545, y: 75, t: "Settings (sheet)", s: "gear on Home", d: "Groups: Sheep (voice Lock in / Gentle, ask before acting, what Sheep remembers → Notebook), Modes (Pomodoro 15/25/50, Blocked in Focus, work apps to mute, Shortcuts setup), Privacy (forget everything).", f: ["Sheep/Views/SettingsView.swift", "Sheep/Views/Settings/SettingsDetailViews.swift", "Sheep/Views/SetupView.swift"] },
+  { id: "home", x: 20, y: 145, t: "Home", s: "score · pills · brief", d: "Wordmark + gear, hero sheep, mode label + today's score and delta, Focus/Rest/Play pills with per-mode scores, the Sheep message card (daily brief or how-to), and one primary button.", f: ["Sheep/Views/HomeView.swift", "Sheep/Views/Home/SheepMessageCard.swift", "Sheep/Views/Home/ModePills.swift"] },
+  { id: "apps", x: 285, y: 145, t: "Apps tab", s: "what's hidden now", d: "Instagram and YouTube with captions taken from Policy for the current mode, plus the muted work apps.", f: ["Sheep/Views/Home/AppsView.swift"] },
+  { id: "nb", x: 545, y: 145, t: "Notebook", s: "memory files", d: "Every memory file, grouped into sections, with the history snapshot count.", f: ["Sheep/Views/NotebookView.swift", "Sheep/Views/NotebookModel.swift"] },
+  { id: "intake", x: 20, y: 215, t: "Focus intake", s: "3 questions + count", d: "One question per screen; Q1 is pre-filled from the active workstream. Then the planner prompt runs (≤3 s).", f: ["Sheep/Views/FocusIntakeView.swift", "Sheep/Services/FocusController.swift"] },
+  { id: "rest", x: 195, y: 215, t: "Rest", s: "activity + limit", d: "Spotify / Netflix / Sport / Walk / custom with a 15–60 min limit. The overuse notification fires (20 s in fast mode). DMs are open in the wrappers and work apps show as muted.", f: ["Sheep/Views/RestView.swift", "Sheep/Services/RestController.swift"] },
+  { id: "play", x: 370, y: 215, t: "Play", s: "game timer", d: "30/60/90 min limit, muted work apps, +10 XP if you end under the limit. Its notification text is fixed (no Gemini).", f: ["Sheep/Views/PlayView.swift"] },
+  { id: "file", x: 545, y: 215, t: "Notebook file", s: "view · edit · delete", d: "Renders the markdown (header hidden), lets you edit the raw file or delete it. Every change is snapshotted to history/.", f: ["Sheep/Views/NotebookFileView.swift"] },
+  { id: "sess", x: 20, y: 285, t: "Focus session", s: "ring · checklist", d: "Pomodoro ring driven by the wall clock (survives relaunch), plan opener and watch-out, checklist (+20 XP per tick), Instagram/YouTube links, “finish session”. No auto-finish.", f: ["Sheep/Views/FocusSessionView.swift", "Sheep/Services/PomodoroTimer.swift"] },
+  { id: "wrap", x: 285, y: 285, t: "Wrapper", s: "full-screen web view", d: "Close button, app name and mode dot. Hosts BlockedOverlay and InterventionOverlay over the live page.", f: ["Sheep/Wrapper/WrapperView.swift"] },
+  { id: "cong", x: 20, y: 355, t: "Congrats", s: "XP · learned", d: "Shows instantly with the offline card. The live reflection and “what sheep learned” fade in when they arrive.", f: ["Sheep/Views/CongratsView.swift"] },
+  { id: "blk", x: 195, y: 355, t: "BlockedOverlay", s: "“Not now”", d: "Shown when the mode blocks the path. The user is sent back to the feed or to the session.", f: ["Sheep/Wrapper/BlockedOverlay.swift"] },
+  { id: "nudge", x: 370, y: 355, t: "InterventionOverlay", s: "Gemini nudge", d: "Dark scrim (the one gradient allowed), the sheep, the headline and message, one primary button plus “keep scrolling”.", f: ["Sheep/Views/InterventionOverlay.swift"] }
+].map(n => ({ w: nw, h: nh, ...n }));
+const navEdges = [["links", "app"], ["app", "tabs"], ["tabs", "home"], ["tabs", "apps"], ["tabs", "nb"], ["home", "dev"], ["home", "set"],
+  ["home", "intake"], ["home", "rest"], ["home", "play"], ["intake", "sess"], ["sess", "cong"], ["sess", "wrap"], ["rest", "wrap"], ["apps", "wrap"],
+  ["nb", "file"], ["wrap", "blk"], ["wrap", "nudge"], ["nudge", "sess", "back"]];
+const navDetail = document.getElementById("navDetail");
+diagram(document.getElementById("navsvg"), navNodes, navEdges, n => show(navDetail, n));
+
+/* ---------- 3. policy ---------- */
+const notes = {
+  focus: "Focus blocks Reels, DMs and Shorts and nudges hardest. The Gemini nudge quotes your session goal.",
+  rest: "Rest opens everything (DMs included) and only nudges about duration, gently. The overuse notification comes from the Rest timer, not the wrapper.",
+  play: "Play blocks nothing and never nudges. Work apps show as muted, and ending under your limit earns +10 XP.",
+  idle: "No mode: everything is allowed and nothing is nudged."
+};
+function pickMode(m) {
+  document.querySelectorAll("#modeChips .chip").forEach(c => c.classList.toggle("on", c.dataset.m === m));
+  document.querySelectorAll("#ptable [data-c]").forEach(c => c.classList.toggle("hl", c.dataset.c === m && c.tagName === "TH"));
+  document.querySelectorAll("#ptable td[data-c]").forEach(c => { c.style.background = c.dataset.c === m ? "var(--fog)" : ""; });
+  document.getElementById("policyNote").textContent = notes[m];
+}
+document.querySelectorAll("#modeChips .chip").forEach(c => c.onclick = () => pickMode(c.dataset.m));
+pickMode("focus");
+
+/* ---------- 4. gemini scenarios ---------- */
+const S = [
+  { segs: [["proxy → Gemini ≈1.2 s · live", 40, "#2E7D5B"]], t: "Supabase signs you in, the Edge Function checks the quota, Gemini answers inside the proxy's slot, and the live JSON is decoded. (Timings are illustrative.)" },
+  { segs: [["proxy 404", 10, "#8B8F8C"], ["direct key → Gemini · live", 40, "#3D5AFE"]], t: "What happens today if SUPABASE_HOST and a dev GEMINI_API_KEY are both set: the function isn't deployed, so the proxy fails fast with 404 and the client spends what's left on a direct call. It works, but the key ships inside the app (dev only)." },
+  { segs: [["proxy 404", 10, "#8B8F8C"], ["direct 403", 10, "#B4442E"], ["fallback (instant)", 6, "#17191A"]], t: "The key currently returns 403 API_KEY_SERVICE_BLOCKED. Every call ends on its fallback, quietly. The demo looks fine but nothing it says is Gemini-written. Fix the key's API restrictions (Generative Language API) and set it as the Supabase secret." },
+  { segs: [["connect error", 6, "#8B8F8C"], ["fallback", 6, "#17191A"]], t: "No network: the request fails fast and later Supabase calls skip the network for 15 s. If the radio hangs instead, the hard 3 s deadline still returns the fallback." },
+  { segs: [["fallback (0 s)", 4, "#17191A"]], t: "No SUPABASE_HOST/ANON_KEY and no GEMINI_API_KEY: isConfigured is false, so fallbacks come back immediately and the daily brief uses OfflineBrief." }
+];
+function pickS(i) {
+  document.querySelectorAll("#gchips .chip").forEach(c => c.classList.toggle("on", +c.dataset.s === i));
+  const bar = document.getElementById("gbar"); bar.innerHTML = "";
+  let used = 0; S[i].segs.forEach(([label, pct, col]) => { const d = document.createElement("div"); d.style.width = pct + "%"; d.style.background = col; if (col === "#17191A") d.style.color = "#F2F2EE"; d.textContent = label; bar.appendChild(d); used += pct; });
+  const rest = document.createElement("div"); rest.style.flex = "1"; bar.appendChild(rest);
+  document.getElementById("gtext").textContent = S[i].t;
+}
+document.querySelectorAll("#gchips .chip").forEach(c => c.onclick = () => pickS(+c.dataset.s));
+pickS(0);
+
+/* ---------- 5. prompts ---------- */
+const P = [
+  ["1 · Daily brief", "DailyBriefPrompt.swift", "When Home appears and on the first open of a day, after seeding and after a reset. Cached per day by DailyBriefService.", "NOW (weekday, date, time, tz) + MEMORY", "headline · body · suggestedMode", "OfflineBrief built from yesterday's real events + the nearest workstream deadline, e.g. “Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40. Lock in — Dissertation ch.3 is due Friday.” With no history: “How to start”.", "0.8 · 3 s"],
+  ["2 · Focus planner", "PlannerPrompt.swift", "Intake → “plan” (FocusController.makePlan).", "Length + Pomodoros, Q1 goal, Q2 done-looks-like, Q3 distractions, NOW, MEMORY (with goal keywords)", "title · opener · checklist (3–5) · watchOut · workstream", "Built from your answers: the workstream's next step becomes item 1 and yesterday's recap opens the plan. Live output is also tidied up (3–5 non-empty items).", "0.6 · 3 s"],
+  ["3 · Doom-scroll nudge", "NudgePrompt.swift", "A scroll streak in a wrapper crosses the mode threshold (ScrollMonitor).", "Mode, app, section, minutes scrolled, nudges so far, goal + checklist, min left, voice, MEMORY (with app keywords)", "headline · message · primaryAction · primaryLabel · tone", "Per-mode copy naming the real goal and minutes: firm (“Reels can wait”), gentle, or playful.", "0.9 · 3 s"],
+  ["4 · Rest overuse", "RestNudgePrompt.swift", "When Rest starts. The fallback notification is scheduled straight away and the Gemini text replaces it if it arrives in time.", "Activity, limit, projected minutes, NOW, MEMORY", "title · body (local notification)", "“that was a good rest — 50 min of netflix, past your 45. stand up, stretch and grab some water 🐑” (or a sleep hint after 22:00).", "0.8 · 3 s"],
+  ["5 · Reflection", "ReflectionPrompt.swift", "Finish session. Runs alongside the consolidator; Congrats is already on screen.", "Title, planned/actual min, checklist done/remaining, nudges shown/resisted, scroll minutes, MEMORY", "headline · summary · xpBonus 0–50 · nextStep", "An honest rule-based card (“A start, not a finish.”) with a bonus of 0–30, plus extra for resisted nudges and less for scrolling.", "0.7 · 3 s"],
+  ["6 · Consolidator", "ConsolidatorPrompt.swift", "Session end, the first open of a new day, and the dev button. No Persona: it acts as a librarian.", "All memory files + new events (JSONL) since lastRunAt", "files [{path, content, op}] · learned [≤3]", "OfflineConsolidator: re-renders the daily timeline, merges patterns and what-works counts, logs workstream progress and writes learned lines. It never invents anything.", "0.2 · 15 s"]
+];
+document.getElementById("prompts").innerHTML = P.map(([n, f, when, inp, out, fb, cfg]) =>
+  `<details><summary>${n} <span class="cap" style="margin-left:6px">temp ${cfg}</span></summary><ul><li><b>Fires:</b> ${when}</li><li><b>In:</b> ${inp}</li><li><b>Out (JSON):</b> ${out}</li><li><b>Offline:</b> ${fb}</li><li>${link("Sheep/Services/Prompts/" + f, f)}</li></ul></details>`).join("") +
+  `<p style="font-size:13.5px">Play has no Gemini prompt: its over-limit notification is fixed copy (<code>RestController.playFallback</code>).</p>`;
+
+/* ---------- 5b. memory loop ---------- */
+const mw = 168, mh = 46;
+const memNodes = [
+  { id: "ev", x: 20, y: 30, t: "Things happen", s: "sessions · scroll · nudges", d: "FocusController, ScrollMonitor, RestController and WrapperView call EventLog.append. A nudge's outcome (returned/ignored) and tone are logged, and that is how Sheep learns which tone works.", f: ["Sheep/Services/EventLog.swift"] },
+  { id: "log", x: 276, y: 30, t: "events.jsonl", s: "append-only", d: "The raw diary, one JSON object per line. Only paths, timings and your typed answers.", f: ["Sheep/Services/EventLog.swift"] },
+  { id: "con", x: 532, y: 30, t: "Consolidator", s: "Gemini §6 / offline", d: "Picks up the events since lastRunAt, rewrites the files (snapshot first), saves learned[] and posts .memoryDidChange so Home refreshes.", f: ["Sheep/Memory/MemoryConsolidator.swift"] },
+  { id: "files", x: 532, y: 150, t: "Memory files", s: "markdown + YAML header", d: "profile.md · timeline/daily/YYYY-MM-DD.md · knowledge/patterns.md · knowledge/what-works.md · workstreams/active|completed/*.md", f: ["Sheep/Memory/MemoryStore.swift"] },
+  { id: "ctx2", x: 276, y: 150, t: "MemoryContext.build", s: "≤ 6,000 chars", d: "Builds the {{MEMORY}} block for each purpose (brief, planner, nudge, rest, reflection), with alias keyword hits for the app or goal.", f: ["Sheep/Memory/MemoryContext.swift"] },
+  { id: "pr", x: 20, y: 150, t: "Prompts 1–5", s: "Persona + {{MEMORY}}", d: "Gemini is told to bring up yesterday naturally and to use only real numbers from MEMORY.", f: ["Sheep/Services/Prompts/Persona.swift"] },
+  { id: "user", x: 20, y: 268, t: "“Yesterday you… lock in”", s: "brief · plan · nudge", d: "The sentence shows on the Home card, in the plan opener and in nudges. Offline, OfflineBrief.recapSentence makes the same line from the raw events.", f: ["Sheep/Memory/DailyBriefService.swift"] },
+  { id: "learn", x: 276, y: 268, t: "Congrats", s: "what sheep learned", d: "Up to 3 learned[] lines from the consolidator run at session end.", f: ["Sheep/Views/CongratsView.swift"] },
+  { id: "note", x: 532, y: 268, t: "Notebook", s: "read · edit · delete", d: "Full transparency: you can fix or forget anything Sheep knows.", f: ["Sheep/Views/NotebookView.swift"] }
+].map(n => ({ w: mw, h: mh, ...n }));
+const memEdges = [["ev", "log"], ["log", "con"], ["con", "files", "", "snapshot → write"], ["files", "ctx2"], ["ctx2", "pr", "", "{{MEMORY}}"], ["pr", "user"], ["user", "ev", "back", "you act"], ["con", "learn", "async"], ["files", "note"]];
+diagram(document.getElementById("memsvg"), memNodes, memEdges, n => show(document.getElementById("memDetail"), n));
+
+/* ---------- 6. walkthrough ---------- */
+const WS = [
+  ["Seed yesterday", "Dev menu → “seed yesterday” (or launch with -sheepSeedYesterday in DEBUG).", "Home card: “Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40. Lock in — Dissertation ch.3 is due Friday.”", "8 events dated yesterday: 21:05 Focus start (75 min planned), Reels 4.5 min, firm nudge ignored, 1 checklist item, end 1/3, Reels 12 min at 22:40, playful nudge returned, Netflix 110/45 min.", "profile.md, timeline/daily/&lt;yesterday&gt;.md, patterns.md, what-works.md, workstreams/active/dissertation-ch3.md. lastRunAt is set so they aren't consolidated again.", "8 event rows + 5 memory_files rows queued."],
+  ["Start focus", "Home → Start focus → three questions (Q1 pre-filled “Dissertation ch.3”) → planner.", "Plan: title, opener that mentions yesterday, 3–5 item checklist, watch-out. Pomodoro ring (1 min each with fast timers).", "mode_change, session_start {title, workstream, plannedMin, answers}.", "—", "events rows; the session_start is held to pair with the end."],
+  ["Open Instagram → Reels", "Tap “instagram” in the session, then tap Reels or DMs.", "BlockedOverlay: “Not now — you're focusing on Dissertation ch.3.” Links to Reels and DMs are hidden too.", "wrapper_open, blocked {app, section}.", "—", "events rows."],
+  ["Doom-scroll the feed", "Keep scrolling the feed for 30 s (fast timers).", "InterventionOverlay with the Gemini nudge (or a fallback) naming the goal, the minutes and yesterday's pattern.", "scroll {app, section, activeMin} when the streak ends.", "—", "1 Gemini call through the proxy, counted in gemini_calls (if deployed)."],
+  ["Back to focus", "Tap the primary button.", "The wrapper closes and you're back on the session. +15 XP (−10 and wool shedding if you ignore it for 60 s).", "nudge {tone, action, outcome: returned}.", "—", "events row."],
+  ["Tick + finish", "Tick all items (+20 XP each) → finish session.", "Congrats appears instantly with the offline card and XP, then the live reflection and “what sheep learned” fade in.", "checklist_done ×3, session_end {actualMin, done, total, xp}.", "Consolidator rewrites today's daily file, patterns, what-works and workstream progress (snapshot in history/).", "events + 1 sessions row + changed memory_files + daily_scores (debounced 2 s)."],
+  ["Switch to Rest", "Home → Rest → Netflix, 45 min.", "DMs are open in the Instagram wrapper. After 20 s: “that was a good rest — 50 min of netflix, past your 45…”", "mode_change; rest_activity {activity, limitMin, actualMin, xp} when it ends.", "—", "events rows (no sessions row for Rest)."],
+  ["Play", "Home → Play → 60 min.", "Timer and muted work apps. +10 XP if you end under the limit. The art shows the awake sheep (controller art is missing).", "play_session on end.", "—", "events row, daily_scores update."]
+];
+let wi = 0;
+const steps = document.getElementById("steps");
+WS.forEach((_, i) => { const b = document.createElement("button"); b.textContent = i + 1; b.onclick = () => go(i); steps.appendChild(b); });
+function go(i) {
+  wi = Math.max(0, Math.min(WS.length - 1, i));
+  const [t, body, ui, ev, mem, sup] = WS[wi];
+  steps.querySelectorAll("button").forEach((b, j) => b.classList.toggle("on", j === wi));
+  document.getElementById("wTitle").textContent = (wi + 1) + " · " + t;
+  document.getElementById("wBody").textContent = body;
+  document.getElementById("wUI").innerHTML = ui; document.getElementById("wEv").innerHTML = ev;
+  document.getElementById("wMem").innerHTML = mem; document.getElementById("wSup").innerHTML = sup;
+  document.getElementById("wNext").textContent = wi === WS.length - 1 ? "Start over" : "Next step";
+}
+document.getElementById("wNext").onclick = () => go(wi === WS.length - 1 ? 0 : wi + 1);
+document.getElementById("wPrev").onclick = () => go(wi - 1);
+go(0);
+
+/* ---------- 7. status ---------- */
+const ST = [
+  ["done", "Wrappers + blocking", "Instagram and YouTube mobile web, URL blocking, CSS hiding, logins via Facebook/Google stay inside (#11, #19)."],
+  ["done", "Focus flow", "Intake → Gemini plan → Pomodoro → congrats (#17)."],
+  ["done", "Doom-scroll nudge", "ScrollMonitor + InterventionOverlay (#4)."],
+  ["done", "Rest & Play", "Limit timers, overuse notification, muted work apps (#10)."],
+  ["done", "Memory loop", "Store, consolidator (live + offline), context, daily brief, seed (#9)."],
+  ["done", "Notebook", "Read / edit / delete with history snapshots (#6)."],
+  ["done", "XP + wool", "Stages at 50/150/300/500 XP, wool shed (#8, #14)."],
+  ["done", "Shortcuts + deep links", "App Intents and a setup screen. The user builds the automations by hand (#7)."],
+  ["done", "Home/Settings redesign", "Score, pills, message card, tab bar, Apps tab (#13, #19)."],
+  ["done", "Supabase code", "Migration, Edge Function + Deno tests, Swift client + queue (#12)."],
+  ["miss", "Edge Function deployed", "POST /functions/v1/gemini → 404 on wfrlvenjytnowvjuzgom (24 Oct)."],
+  ["unv", "Tables / migration applied", "Couldn't check: the Supabase MCP refused access."],
+  ["miss", "Gemini key works", "User-reported 403 API_KEY_SERVICE_BLOCKED, so every call uses its fallback."],
+  ["miss", "Play sheep art", "The controller asset is missing; Play shows the awake sheep."],
+  ["part", "Animated sheep", "PR #16 open, not wired into SheepView."],
+  ["part", "Acceptance UI test", "PR #18 open: full demo offline with screenshots."],
+  ["miss", "Brief refresh button", "Asked for in BUILD_PROMPT step 6; not built."],
+  ["part", "sessions table", "Only Focus sessions are written; Rest/Play are missing."],
+  ["unv", "Backup video · Devpost · pitch", "Not in the repo."]
+];
+const label = { done: "done", part: "partial", miss: "missing", unv: "unverified" };
+document.getElementById("statusGrid").innerHTML = ST.map(([s, t, d]) => `<div class="card"><span class="pill ${s}">${label[s]}</span><div class="ttl" style="margin-top:8px">${t}</div><p>${d}</p></div>`).join("");
+</script>
+</body>
+</html>
