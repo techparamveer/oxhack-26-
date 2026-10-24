@@ -17,7 +17,7 @@ struct InterventionOverlay: View {
 
             VStack(spacing: Theme.space(3)) {
                 Spacer()
-                SheepView(woolStage: state.progress.woolStage, size: 88)
+                SheepView(woolStage: state.progress.woolStage, size: 120, mode: request.mode, xp: state.progress.xp)
                     .scaleEffect(appeared ? 1 : 0.8)
                     .rotationEffect(.degrees(appeared ? 0 : -8))
                     .offset(y: appeared ? 0 : Theme.space(1))
@@ -65,7 +65,7 @@ struct InterventionOverlay: View {
         ], startPoint: .top, endPoint: .bottom)
     }
 
-    private static let scrimColor = Color(hex: 0x0E0F0E)
+    private static let scrimColor = Theme.scrim
 
     private func choose(_ action: NudgeAction) {
         state.scrollMonitor.userChose(action)
