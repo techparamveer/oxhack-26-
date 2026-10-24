@@ -9,6 +9,7 @@ struct XPChangeLabel: View {
     /// How far the label rises before it fades.
     var rise: CGFloat = 28
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var items: [Item] = []
 
     private struct Item: Identifiable {
@@ -20,7 +21,7 @@ struct XPChangeLabel: View {
     var body: some View {
         ZStack {
             ForEach(items) { item in
-                FloatingCaption(text: item.text, color: item.gained ? Theme.scoreUp : Theme.scoreDown, rise: rise)
+                FloatingCaption(text: item.text, color: item.gained ? Theme.scoreUp : Theme.scoreDown, rise: reduceMotion ? 0 : rise)
             }
         }
         .allowsHitTesting(false)

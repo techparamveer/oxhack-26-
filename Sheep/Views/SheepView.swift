@@ -15,6 +15,7 @@ struct SheepView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var bursts: [ShedBurst] = []
     @State private var shakes = 0
+    @State private var onScreen = false
 
     init(woolStage: Int, size: CGFloat = 160, mode: Mode = .idle, xp: Int? = nil) {
         self.woolStage = woolStage
@@ -40,12 +41,16 @@ struct SheepView: View {
                         SpringKeyframe(0, duration: 0.12)
                     }
                 }
-                .modifier(Breathing(enabled: !reduceMotion))
+                .modifier(Breathing(enabled: onScreen && !reduceMotion))
             ForEach(bursts) { burst in
-                WoolShedPuffs(burst: burst, art: art, stage: CGFloat(stage), size: size, line: line)
+                WoolShedPuffs(burst: burst, art: art, stage: CGFloat(stage), size: size, line: line,
+                              reduceMotion: reduceMotion)
             }
         }
         .frame(width: size * 1.2, height: size)
+        // The idle loop only runs while the sheep is on screen (stops behind pushed screens / other tabs).
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
         .onChange(of: xp) { old, new in
             guard WoolShed.shouldShed(from: old, to: new), let old, let new else { return }
             let burst = ShedBurst(count: WoolShed.puffCount(lost: old - new))
@@ -207,6 +212,8 @@ private struct WoolShedPuffs: View {
     let stage: CGFloat
     let size: CGFloat
     let line: CGFloat
+    /// Reduce Motion: the puffs fade where they are instead of falling.
+    let reduceMotion: Bool
     @State private var falling = false
 
     private static let rimPuffs = [10, 11, 1, 9, 0]
@@ -226,9 +233,9 @@ private struct WoolShedPuffs: View {
                     .overlay(Circle().stroke(SheepPalette.rim, lineWidth: line))
                     .frame(width: r * 2, height: r * 2)
                     .position(start)
-                    .offset(x: falling ? Self.drifts[i % 5] * size : 0,
-                            y: falling ? size * (0.42 + 0.06 * CGFloat(i)) : 0)
-                    .rotationEffect(.degrees(falling ? Double(i * 25 - 30) : 0))
+                    .offset(x: falling && !reduceMotion ? Self.drifts[i % 5] * size : 0,
+                            y: falling && !reduceMotion ? size * (0.42 + 0.06 * CGFloat(i)) : 0)
+                    .rotationEffect(.degrees(falling && !reduceMotion ? Double(i * 25 - 30) : 0))
                     .animation(.easeOut(duration: WoolShed.duration).delay(delay), value: falling)
                     .opacity(falling ? 0 : 1)
                     .animation(.easeIn(duration: WoolShed.duration).delay(delay), value: falling)
