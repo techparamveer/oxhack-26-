@@ -298,3 +298,4 @@ Temperature 0.2.
 {"ts":"2026-10-24T22:40:00Z","type":"rest_activity","activity":"netflix","limitMin":45,"actualMin":110}
 ```
 `outcome` for nudges: `"returned"` (went back / closed app within 60 s) or `"ignored"`.
+`section` on scroll / blocked / nudge is `feed` | `reels` | `explore` | `dms` | `shorts`. Focus blocks Reels, Explore and Shorts by default; DMs stay open unless the user ticks them in Settings → Hidden by mode. Never store DM or post content.

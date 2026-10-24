@@ -118,12 +118,13 @@ Key behaviours:
 |---|---|---|---|---|
 | Instagram feed `/` | allowed · nudge after 30 s (fast) / 3 min | allowed · nudge after 2 min (fast) / 30 min | allowed · never nudged | allowed · never nudged |
 | Instagram Reels `/reels/`, `/reel/…`, `/<user>/reels/` | **blocked** (URL + hidden links)* | allowed · Rest nudge | allowed | allowed |
-| Instagram DMs `/direct/…` | **blocked*** | allowed | allowed | allowed |
+| Instagram Explore `/explore/` | **blocked*** | allowed | allowed | allowed |
+| Instagram DMs `/direct/…` | allowed* | allowed | allowed | allowed |
 | YouTube feed | allowed · Focus nudge | allowed · Rest nudge | allowed | allowed |
 | YouTube Shorts `/shorts/…` | **blocked*** | allowed · Rest nudge | allowed | allowed |
 | Work apps (Teams/Outlook/Slack) | — | shown "muted" (display only; real muting = user's iOS Focus Shortcut) | shown "muted" | — |
 
-\* Focus blocks Reels, DMs and Shorts by default; the user can untick any of them in Settings → "Blocked in Focus" (`sheep.blockedInFocus`). The feed can never be blocked. Blocking happens two ways: `WrapperNavigation.decide` cancels full page loads in `decidePolicyFor`, and `inject.js` reports SPA (single-page-app) `pushState` navigations so native shows `BlockedOverlay` and goes back. `Policy.hidingCSS` hides the entry links cosmetically. Nudge cooldown is 120 s; a nudge resolves as `returned` if the user taps a leaving action, opens DMs, or leaves the wrapper within 60 s, else `ignored` (+15 / −10 XP).
+\* Focus blocks Reels, Explore and Shorts by default; DMs stay open. The user can tick or untick any of them in Settings → "Hidden by mode" (`sheep.blockedInFocus`). The feed can never be blocked. Blocking happens two ways: `WrapperNavigation.decide` cancels full page loads in `decidePolicyFor`, and `inject.js` reports SPA (single-page-app) `pushState` navigations so native shows `BlockedOverlay` and goes back. `Policy.hidingCSS` hides the entry links cosmetically (href-only — do not hide a parent nav, or the `/direct/` paper-plane goes with it). Nudge cooldown is 120 s; a nudge resolves as `returned` if the user taps a leaving action, opens DMs, or leaves the wrapper within 60 s, else `ignored` (+15 / −10 XP).
 
 ⚠️ Docs vs code: MVP_PLAN says Rest monitors the feed "lenient" and Reels "monitored" — code uses one Rest threshold for every section. Play/Idle are never nudged.
 
@@ -273,13 +274,13 @@ How "yesterday you… lock in" happens: yesterday's events are rendered into `ti
 
 ## 6. One demo run, step by step
 1. **Seed yesterday** (dev menu, or `-sheepSeedYesterday` launch arg in DEBUG): `MemorySeeder` writes 8 yesterday events (21:05 Focus "Dissertation ch.3 intro" 75 min planned, Reels 4.5 min + ignored firm nudge, 1/3 done, Reels 12 min at 22:40 + returned playful nudge, Netflix 110/45 min), plus `profile.md`, the daily file, `patterns.md`, `what-works.md`, `workstreams/active/dissertation-ch3.md` (due next Friday). Sets `lastRunAt` so the consolidator won't redo it. Brief cache invalidated → Home card: "Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40…". Every file write and event is queued for Supabase.
-2. **Focus**: Home → "Start focus" → intake pre-fills Q1 from the workstream → planner (≤3 s) → `FocusController.start` logs `session_start`, schedules Pomodoro notifications (1 min each with fast timers), mode = focus, wrappers now block Reels/DMs/Shorts.
+2. **Focus**: Home → "Start focus" → intake pre-fills Q1 from the workstream → planner (≤3 s) → `FocusController.start` logs `session_start`, schedules Pomodoro notifications (1 min each with fast timers), mode = focus, wrappers now block Reels/Explore/Shorts (DMs stay open).
 3. **Scroll Reels** → blocked: `BlockedOverlay` ("Not now — you're focusing on …"), `blocked` event. Scroll the feed → `inject.js` posts scroll samples every 5 s → after 30 s (fast) `ScrollMonitor` calls the nudge prompt → `InterventionOverlay`.
 4. **Nudge outcome**: "back to focus" → `nudge` event `returned`, +15 XP, `nudgesResisted++`, route back to the session. Ignoring it for 60 s → `ignored`, −10 XP, wool sheds.
 5. **Tick checklist** (+20 XP each, `checklist_done`) → **finish session** → `session_end` logged, Congrats shows instantly with the offline card and XP (minute blocks + 50 if complete + bonus); reflection and consolidation run in parallel and patch the card ("what sheep learned").
 6. **Memory update**: consolidator rewrites today's daily file, patterns, what-works and workstream progress (history snapshot first) → `.memoryDidChange` → Home score/brief recompute.
 7. **Supabase sync** (background): rows for `events`, `memory_files`, one `sessions` row, and the debounced `daily_scores` row upsert via `SyncQueue`.
-8. **Rest** → pick Netflix 45 min → notification after 20 s real time ("50 min of netflix, past your 45…"), DMs open in the wrapper. **Play** → timer, muted work apps, +10 XP if ended under the limit.
+8. **Rest** → pick Netflix 45 min → notification after 20 s real time ("50 min of netflix, past your 45…"), Reels and Explore come back in the wrapper. **Play** → timer, muted work apps, +10 XP if ended under the limit.
 
 ## 7. Status board
 

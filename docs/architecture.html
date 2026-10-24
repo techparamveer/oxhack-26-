@@ -171,7 +171,8 @@ details ul{margin:8px 0 2px;padding-left:18px;color:var(--body);font-size:14px;l
         <tbody>
           <tr><td>Instagram feed</td><td data-c="focus">allowed · nudge at 30 s fast / 3 min</td><td data-c="rest">allowed · nudge at 2 min fast / 30 min</td><td data-c="play">allowed, never nudged</td><td data-c="idle">allowed, never nudged</td></tr>
           <tr><td>Instagram Reels</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed · nudged</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
-          <tr><td>Instagram DMs</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed (open)</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
+          <tr><td>Instagram Explore</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
+          <tr><td>Instagram DMs</td><td data-c="focus">allowed*</td><td data-c="rest">allowed</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
           <tr><td>YouTube feed</td><td data-c="focus">allowed · nudged</td><td data-c="rest">allowed · nudged</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
           <tr><td>YouTube Shorts</td><td data-c="focus" class="blk">blocked*</td><td data-c="rest">allowed · nudged</td><td data-c="play">allowed</td><td data-c="idle">allowed</td></tr>
           <tr><td>Teams · Outlook · Slack</td><td data-c="focus">—</td><td data-c="rest">shown “muted”†</td><td data-c="play">shown “muted”†</td><td data-c="idle">—</td></tr>
@@ -179,7 +180,7 @@ details ul{margin:8px 0 2px;padding-left:18px;color:var(--body);font-size:14px;l
       </table>
     </div>
     <p id="policyNote"></p>
-    <p style="font-size:13.5px">* Default; can be unticked in Settings → “Blocked in Focus”. The feed can never be blocked. Blocking works on the <b>URL path</b> (<code>/reels/</code>, <code>/reel/…</code>, <code>/&lt;user&gt;/reels/</code>, <code>/direct/</code>, <code>/shorts/</code>) both on full page loads and on in-page (single-page-app) navigations reported by <a class="f" data-p="Sheep/Wrapper/inject.js">inject.js</a>. Hiding CSS only removes the links cosmetically. † Display only: real muting is the user's own iOS Focus, switched on by a Shortcut (<a class="f" data-p="Sheep/Views/SetupView.swift">SetupView</a>). Nudge cooldown 2 min. Outcome is “returned” (+15 XP) if you tap a leaving button, open DMs or leave the wrapper within 60 s, otherwise “ignored” (−10 XP, wool sheds).</p>
+    <p style="font-size:13.5px">* Default; can be ticked or unticked in Settings → “Hidden by mode”. Focus blocks Reels, Explore and Shorts; DMs stay open unless the user ticks them. The feed can never be blocked. Blocking works on the <b>URL path</b> (<code>/reels/</code>, <code>/reel/…</code>, <code>/&lt;user&gt;/reels/</code>, <code>/explore/</code>, <code>/direct/</code>, <code>/shorts/</code>) both on full page loads and on in-page (single-page-app) navigations reported by <a class="f" data-p="Sheep/Wrapper/inject.js">inject.js</a>. Hiding CSS only removes the links cosmetically (href-only, so the inbox paper-plane stays). † Display only: real muting is the user's own iOS Focus, switched on by a Shortcut (<a class="f" data-p="Sheep/Views/SetupView.swift">SetupView</a>). Nudge cooldown 2 min. Outcome is “returned” (+15 XP) if you tap a leaving button, open DMs or leave the wrapper within 60 s, otherwise “ignored” (−10 XP, wool sheds).</p>
   </section>
 
   <!-- 4. BACKEND -->
@@ -366,7 +367,7 @@ const navNodes = [
   { id: "apps", x: 285, y: 145, t: "Apps tab", s: "what's hidden now", d: "Instagram and YouTube with captions taken from Policy for the current mode, plus the muted work apps.", f: ["Sheep/Views/Home/AppsView.swift"] },
   { id: "nb", x: 545, y: 145, t: "Notebook", s: "memory files", d: "Every memory file, grouped into sections, with the history snapshot count.", f: ["Sheep/Views/NotebookView.swift", "Sheep/Views/NotebookModel.swift"] },
   { id: "intake", x: 20, y: 215, t: "Focus intake", s: "3 questions + count", d: "One question per screen; Q1 is pre-filled from the active workstream. Then the planner prompt runs (≤3 s).", f: ["Sheep/Views/FocusIntakeView.swift", "Sheep/Services/FocusController.swift"] },
-  { id: "rest", x: 195, y: 215, t: "Rest", s: "activity + limit", d: "Spotify / Netflix / Sport / Walk / custom with a 15–60 min limit. The overuse notification fires (20 s in fast mode). DMs are open in the wrappers and work apps show as muted.", f: ["Sheep/Views/RestView.swift", "Sheep/Services/RestController.swift"] },
+  { id: "rest", x: 195, y: 215, t: "Rest", s: "activity + limit", d: "Spotify / Netflix / Sport / Walk / custom with a 15–60 min limit. The overuse notification fires (20 s in fast mode). Everything is open in the wrappers and work apps show as muted.", f: ["Sheep/Views/RestView.swift", "Sheep/Services/RestController.swift"] },
   { id: "play", x: 370, y: 215, t: "Play", s: "game timer", d: "30/60/90 min limit, muted work apps, +10 XP if you end under the limit. Its notification text is fixed (no Gemini).", f: ["Sheep/Views/PlayView.swift"] },
   { id: "file", x: 545, y: 215, t: "Notebook file", s: "view · edit · delete", d: "Renders the markdown (header hidden), lets you edit the raw file or delete it. Every change is snapshotted to history/.", f: ["Sheep/Views/NotebookFileView.swift"] },
   { id: "sess", x: 20, y: 285, t: "Focus session", s: "ring · checklist", d: "Pomodoro ring driven by the wall clock (survives relaunch), plan opener and watch-out, checklist (+20 XP per tick), Instagram/YouTube links, “finish session”. No auto-finish.", f: ["Sheep/Views/FocusSessionView.swift", "Sheep/Services/PomodoroTimer.swift"] },
@@ -383,8 +384,8 @@ diagram(document.getElementById("navsvg"), navNodes, navEdges, n => show(navDeta
 
 /* ---------- 3. policy ---------- */
 const notes = {
-  focus: "Focus blocks Reels, DMs and Shorts and nudges hardest. The Gemini nudge quotes your session goal.",
-  rest: "Rest opens everything (DMs included) and only nudges about duration, gently. The overuse notification comes from the Rest timer, not the wrapper.",
+  focus: "Focus blocks Reels, Explore and Shorts and nudges hardest. DMs stay open. The Gemini nudge quotes your session goal.",
+  rest: "Rest opens everything (Reels and Explore come back) and only nudges about duration, gently. The overuse notification comes from the Rest timer, not the wrapper.",
   play: "Play blocks nothing and never nudges. Work apps show as muted, and ending under your limit earns +10 XP.",
   idle: "No mode: everything is allowed and nothing is nudged."
 };
@@ -448,11 +449,11 @@ diagram(document.getElementById("memsvg"), memNodes, memEdges, n => show(documen
 const WS = [
   ["Seed yesterday", "Dev menu → “seed yesterday” (or launch with -sheepSeedYesterday in DEBUG).", "Home card: “Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40. Lock in — Dissertation ch.3 is due Friday.”", "8 events dated yesterday: 21:05 Focus start (75 min planned), Reels 4.5 min, firm nudge ignored, 1 checklist item, end 1/3, Reels 12 min at 22:40, playful nudge returned, Netflix 110/45 min.", "profile.md, timeline/daily/&lt;yesterday&gt;.md, patterns.md, what-works.md, workstreams/active/dissertation-ch3.md. lastRunAt is set so they aren't consolidated again.", "8 event rows + 5 memory_files rows queued."],
   ["Start focus", "Home → Start focus → three questions (Q1 pre-filled “Dissertation ch.3”) → planner.", "Plan: title, opener that mentions yesterday, 3–5 item checklist, watch-out. Pomodoro ring (1 min each with fast timers).", "mode_change, session_start {title, workstream, plannedMin, answers}.", "—", "events rows; the session_start is held to pair with the end."],
-  ["Open Instagram → Reels", "Tap “instagram” in the session, then tap Reels or DMs.", "BlockedOverlay: “Not now — you're focusing on Dissertation ch.3.” Links to Reels and DMs are hidden too.", "wrapper_open, blocked {app, section}.", "—", "events rows."],
+  ["Open Instagram → Reels", "Tap “instagram” in the session, then tap Reels or Explore.", "BlockedOverlay: “Not now — you're focusing on Dissertation ch.3.” DMs stay open; Reels and Explore links are hidden.", "wrapper_open, blocked {app, section}.", "—", "events rows."],
   ["Doom-scroll the feed", "Keep scrolling the feed for 30 s (fast timers).", "InterventionOverlay with the Gemini nudge (or a fallback) naming the goal, the minutes and yesterday's pattern.", "scroll {app, section, activeMin} when the streak ends.", "—", "1 Gemini call through the proxy, counted in gemini_calls (if deployed)."],
   ["Back to focus", "Tap the primary button.", "The wrapper closes and you're back on the session. +15 XP (−10 and wool shedding if you ignore it for 60 s).", "nudge {tone, action, outcome: returned}.", "—", "events row."],
   ["Tick + finish", "Tick all items (+20 XP each) → finish session.", "Congrats appears instantly with the offline card and XP, then the live reflection and “what sheep learned” fade in.", "checklist_done ×3, session_end {actualMin, done, total, xp}.", "Consolidator rewrites today's daily file, patterns, what-works and workstream progress (snapshot in history/).", "events + 1 sessions row + changed memory_files + daily_scores (debounced 2 s)."],
-  ["Switch to Rest", "Home → Rest → Netflix, 45 min.", "DMs are open in the Instagram wrapper. After 20 s: “that was a good rest — 50 min of netflix, past your 45…”", "mode_change; rest_activity {activity, limitMin, actualMin, xp} when it ends.", "—", "events rows (no sessions row for Rest)."],
+  ["Switch to Rest", "Home → Rest → Netflix, 45 min.", "Reels and Explore come back in the Instagram wrapper. After 20 s: “that was a good rest — 50 min of netflix, past your 45…”", "mode_change; rest_activity {activity, limitMin, actualMin, xp} when it ends.", "—", "events rows (no sessions row for Rest)."],
   ["Play", "Home → Play → 60 min.", "Timer and muted work apps. +10 XP if you end under the limit. The art shows the awake sheep (controller art is missing).", "play_session on end.", "—", "events row, daily_scores update."]
 ];
 let wi = 0;
