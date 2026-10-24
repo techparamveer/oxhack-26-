@@ -3,6 +3,8 @@ import Observation
 
 enum Route: Hashable {
     case focusIntake, focusSession, congrats, rest, play, notebook, setup
+    /// One memory file in Sheep's Notebook (path relative to the memory root).
+    case notebookFile(String)
 }
 
 /// Navigation for the single NavigationStack on Home, plus the full-screen wrapper.
