@@ -21,12 +21,9 @@ struct FocusSessionView: View {
         .onChange(of: state.activeSession?.id) { _, _ in makeTimer() }
         .task(id: timer?.sessionID) { await timer?.run() }
         .onChange(of: scenePhase) { _, phase in if phase == .active { timer?.tick() } }
-        .onChange(of: timer?.isFinished ?? false) { was, now in
-            // Auto-finish only when the last Pomodoro ends while the user is looking at this screen.
-            if !was && now && scenePhase == .active && router.presentedWrapper == nil && router.path.last == .focusSession {
-                finish()
-            }
-        }
+        // No auto-finish when time runs out: the ring shows "time's up · tick what you finished" (matching the
+        // notification) so the user ticks first and taps finish — otherwise a demo mid-sentence jumps to a
+        // "Not this time." card with nothing ticked.
     }
 
     private func content(_ session: FocusSession) -> some View {
