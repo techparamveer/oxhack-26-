@@ -82,8 +82,9 @@ struct GeminiResult<T> {
 final class GeminiClient: @unchecked Sendable {
     static let shared = GeminiClient(apiKey: DebugLaunch.isOffline ? "" : nil, proxy: SupabaseClient.shared)
 
-    /// Rolling Flash alias; override with GEMINI_MODEL in Secrets.xcconfig.
-    static let defaultModel = "gemini-flash-latest"
+    /// Rolling Flash-Lite alias: ~1–2 s through the proxy, inside the 3 s budget (Flash with
+    /// thinking takes 5–7 s and always times out). Override with GEMINI_MODEL in Secrets.xcconfig.
+    static let defaultModel = "gemini-flash-lite-latest"
 
     let apiKey: String
     let model: String
