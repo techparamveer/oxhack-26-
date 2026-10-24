@@ -33,6 +33,7 @@ final class DailyBriefService {
     @ObservationIgnored private let log: EventLog
     @ObservationIgnored private let client: GeminiClient
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var inFlight: Task<DailyBriefValue, Never>?
 
     init(defaults: UserDefaults = .standard, store: MemoryStore = .shared, log: EventLog = .shared,
          client: GeminiClient = .shared) {
@@ -48,8 +49,10 @@ final class DailyBriefService {
     }
 
     /// Uses today's cached brief if there is one, otherwise generates it.
+    /// Concurrent callers (card `.task`, launch rollover) share one in-flight load.
     func loadIfNeeded() async {
         if let current, current.day == MemoryDates.day(.now) { return }
+        if let inFlight { _ = await inFlight.value; return }
         await refresh(force: true)
     }
 
@@ -60,8 +63,11 @@ final class DailyBriefService {
         let gen = generation
         isLoading = true
         let (store, log, client) = (self.store, self.log, self.client)
-        let value = await Task.detached { await Self.compute(store: store, log: log, client: client, now: .now) }.value
+        let task = Task.detached { await Self.compute(store: store, log: log, client: client, now: .now) }
+        inFlight = task
+        let value = await task.value
         guard gen == generation else { return } // a newer refresh/invalidate superseded this one
+        inFlight = nil
         current = value
         isLoading = false
         if let data = try? JSONEncoder().encode(value) { defaults.set(data, forKey: Self.cacheKey) }
@@ -70,6 +76,7 @@ final class DailyBriefService {
     /// Drops the cache (e.g. after seeding or forgetting everything).
     func invalidate() {
         generation += 1
+        inFlight = nil
         current = nil
         isLoading = false
         defaults.removeObject(forKey: Self.cacheKey)

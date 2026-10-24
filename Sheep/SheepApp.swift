@@ -17,7 +17,12 @@ struct SheepApp: App {
                 .environment(router)
                 .onOpenURL { router.handle(url: $0, state: state) }
                 .consumesIntentRoutes(router: router, state: state)
-                .task { await NotificationService.shared.requestAuthorization() }
+                .task {
+                    // Rollover first (idempotent, guarded by the persisted day) so the permission
+                    // alert below — which keeps the scene `.inactive` — never delays it.
+                    DailyRollover.handleActive()
+                    await NotificationService.shared.requestAuthorization()
+                }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     if phase == .active { DailyRollover.handleActive() }
                 }

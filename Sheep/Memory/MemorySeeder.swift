@@ -128,7 +128,8 @@ enum MemoryReset {
     }
 }
 
-/// First `.active` of a new calendar day: consolidate yesterday, then refresh the brief. Never blocks UI.
+/// First launch / first `.active` of a new calendar day: consolidate yesterday, then refresh the brief.
+/// Called from both the app's launch `.task` and `.active`; idempotent via `lastDayKey`. Never blocks UI.
 enum DailyRollover {
     static let lastDayKey = "sheep.memory.lastRolloverDay"
     @MainActor private static var didRunLaunchHooks = false
