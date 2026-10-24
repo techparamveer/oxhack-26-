@@ -49,7 +49,7 @@ struct TabBar: View {
         } label: {
             VStack(spacing: 2) {
                 Image(systemName: Self.icon(tab))
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: 19, weight: .semibold))
                     .frame(height: 22)
                 Text(Self.title(tab))
                     .font(active ? Theme.tab : Theme.tabInactive)

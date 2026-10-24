@@ -64,6 +64,7 @@ struct RestView: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+        .sensoryFeedback(.selection, trigger: isCustom ? "custom" : activity)
         .safeAreaInset(edge: .bottom) {
             PrimaryButton(title: "Start rest", accent: accent, icon: "play.fill") {
                 customFocused = false
@@ -251,5 +252,6 @@ struct LimitPresetPicker: View {
                 .accessibilityAddTraits(active ? .isSelected : [])
             }
         }
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }

@@ -47,7 +47,6 @@ struct NotebookView: View {
             // Cards use the 16 pt card margin; text blocks add their own 24 pt.
             .padding(.horizontal, Theme.cardMargin - Theme.margin)
         }
-        .toolbar(isPushed ? .automatic : .hidden, for: .navigationBar)
         .onAppear(perform: reload)
         .navigationDestination(item: $selected) { entry in
             NotebookFileView(path: entry.path)

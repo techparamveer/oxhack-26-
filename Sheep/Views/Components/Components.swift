@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Pill filled with the mode accent (56 pt, hugging its label unless `fullWidth`).
 /// Use for the ONE primary action on a screen. Play's yellow gets ink text automatically.
@@ -16,8 +17,13 @@ struct PrimaryButton: View {
         return .white
     }
 
+    @State private var taps = 0
+
     var body: some View {
-        Button(action: action) {
+        Button {
+            taps += 1
+            action()
+        } label: {
             ZStack {
                 HStack(spacing: 10) {
                     if let icon {
@@ -39,6 +45,7 @@ struct PrimaryButton: View {
         }
         .buttonStyle(.plain)
         .disabled(isLoading)
+        .sensoryFeedback(.impact(weight: .light), trigger: taps)   // every primary action gets a light tap
     }
 }
 
@@ -135,25 +142,103 @@ struct IconCircleButton: View {
     }
 }
 
-/// Standard screen chrome: fog background, 24 pt margins, Nunito nav title.
-struct Screen<Content: View>: View {
+/// Standard screen chrome: fog background, 24 pt margins, and our own header row instead of the
+/// system navigation bar (iOS 26+ draws its back button as glass): an outlined `IconCircleButton`
+/// chevron when the screen was pushed, a centred Nunito title, and an optional trailing control.
+/// Swipe-back keeps working (see `UINavigationController` below).
+///
+/// - `showsBack: false` for roots / screens that must not go back (Congrats, sheet roots).
+/// - `backDisabled` hides the back button and blocks swipe-back while true (e.g. while planning).
+struct Screen<Content: View, Trailing: View>: View {
     var title: String?
+    var showsBack = true
+    var backDisabled = false
+    @ViewBuilder var trailing: () -> Trailing
     @ViewBuilder var content: () -> Content
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPushed
+
+    init(title: String? = nil, showsBack: Bool = true, backDisabled: Bool = false,
+         @ViewBuilder trailing: @escaping () -> Trailing, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.showsBack = showsBack
+        self.backDisabled = backDisabled
+        self.trailing = trailing
+        self.content = content
+    }
+
+    private var hasBack: Bool { showsBack && isPushed }
+    private var hasHeader: Bool { title != nil || hasBack || ObjectIdentifier(Trailing.self) != ObjectIdentifier(EmptyView.self) }
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            content()
-                .padding(.horizontal, Theme.margin)
-        }
-        .toolbar {
-            if let title {
-                ToolbarItem(placement: .principal) {
-                    Text(title).font(Theme.headline).foregroundStyle(Theme.text)
-                }
+            VStack(spacing: 0) {
+                if hasHeader { header }
+                content()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.horizontal, Theme.margin)
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Theme.background, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+        .onAppear { SwipeBack.blocked = hasBack && backDisabled }
+        .onChange(of: backDisabled) { _, disabled in SwipeBack.blocked = hasBack && disabled }
+        .onDisappear { SwipeBack.blocked = false }
+    }
+
+    private var header: some View {
+        ZStack {
+            if let title {
+                Text(title)
+                    .font(Theme.headline)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                    .padding(.horizontal, 56)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            HStack {
+                if hasBack {
+                    IconCircleButton(systemName: "chevron.left", label: "Back") { dismiss() }
+                        .accessibilityIdentifier("screen.back")
+                        .opacity(backDisabled ? 0 : 1)
+                        .disabled(backDisabled)
+                }
+                Spacer(minLength: 0)
+                trailing()
+            }
+        }
+        .frame(height: 44)
+        .padding(.horizontal, Theme.margin)
+        .padding(.top, 4)
+        .padding(.bottom, 4)
+        .animation(Theme.spring, value: backDisabled)
+    }
+}
+
+extension Screen where Trailing == EmptyView {
+    init(title: String? = nil, showsBack: Bool = true, backDisabled: Bool = false,
+         @ViewBuilder content: @escaping () -> Content) {
+        self.init(title: title, showsBack: showsBack, backDisabled: backDisabled,
+                  trailing: { EmptyView() }, content: content)
+    }
+}
+
+/// Swipe-back with a hidden navigation bar. SwiftUI disables the edge-swipe pop once the system back
+/// button is hidden; re-enable it for every stack deeper than its root (unless a screen blocks it).
+enum SwipeBack {
+    nonisolated(unsafe) static var blocked = false
+}
+
+extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === interactivePopGestureRecognizer else { return true }
+        return viewControllers.count > 1 && !SwipeBack.blocked
     }
 }

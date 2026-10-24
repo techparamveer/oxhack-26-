@@ -72,6 +72,7 @@ enum Theme {
     static let scoreUp    = dynamic(light: 0x2E7D5B, dark: 0x4FAF84)
     static let scoreDown  = dynamic(light: 0xB4442E, dark: 0xD2654D)  // also destructive
     static let ink        = Color(hex: 0x17191A)                       // fixed dark text on the Play accent
+    static let scrim      = Color(hex: 0x0E0F0E)                       // nudge scrim — dark in both appearances
 
     static let focusAccent = Color(hex: 0x3D5AFE)
     static let restAccent  = Color(hex: 0x2E7D5B)

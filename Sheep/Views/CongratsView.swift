@@ -9,14 +9,13 @@ struct CongratsView: View {
     @State private var woolStage: Int?
 
     var body: some View {
-        Screen {
+        Screen(showsBack: false) {
             if let outcome = state.lastOutcome {
                 content(outcome)
             } else {
                 Color.clear
             }
         }
-        .navigationBarBackButtonHidden(true)
         .task {
             guard woolStage == nil else { return }
             let before = Progress(xp: state.progress.xp - (state.lastOutcome?.xpEarned ?? 0)).woolStage
