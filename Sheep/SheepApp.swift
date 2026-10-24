@@ -1,7 +1,21 @@
 import SwiftUI
+import UIKit
+
+/// Sets the notification-center delegate before SwiftUI windows (including Liquid Glass
+/// overlays) come up. `UNUserNotificationCenter.delegate` is weak; `NotificationService`
+/// is a singleton, so this just wins the race against those windows stealing it.
+final class SheepAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        NotificationService.shared.configure()
+        NotificationService.shared.requestAuthorizationSoon()
+        return true
+    }
+}
 
 @main
 struct SheepApp: App {
+    @UIApplicationDelegateAdaptor(SheepAppDelegate.self) private var appDelegate
     @State private var state = AppState()
     @State private var router = Router()
     @Environment(\.scenePhase) private var scenePhase
@@ -20,13 +34,17 @@ struct SheepApp: App {
                 .consumesIntentRoutes(router: router, state: state)
                 .debugLaunchHooks(state: state, router: router)   // DEBUG-only launch args (Sheep/Debug)
                 .task {
-                    // Rollover first (idempotent, guarded by the persisted day) so the permission
-                    // alert below — which keeps the scene `.inactive` — never delays it.
+                    // Rollover even while the permission alert (asked once, in `SheepAppDelegate`)
+                    // keeps the scene `.inactive`. A second concurrent request raced the first on a
+                    // fresh install and left the app "not authorized" despite Allow.
                     DailyRollover.handleActive()
-                    await NotificationService.shared.requestAuthorization()
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in
-                    if phase == .active { DailyRollover.handleActive() }
+                    if phase == .active {
+                        NotificationService.shared.configure()
+                        DailyRollover.handleActive()
+                        RestController.restoreOveruseNotifications(state: state)
+                    }
                 }
         }
     }

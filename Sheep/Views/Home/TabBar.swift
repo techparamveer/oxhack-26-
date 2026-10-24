@@ -31,16 +31,18 @@ struct TabBar: View {
     @Binding var selection: HomeTab
 
     var body: some View {
-        LiquidGlass.container {
-            HStack(spacing: 4) {
-                ForEach(HomeTab.allCases) { tab in
-                    item(tab)
-                }
+        // Buttons sit *above* the glass, not inside GlassEffectContainer / glassEffect.
+        // iOS 26 merges accessibility descendants of a glass view, so XCTest/VoiceOver
+        // then fail to hit `tab.notebook` (`kAXErrorFailure` scrolling to visible).
+        HStack(spacing: 4) {
+            ForEach(HomeTab.allCases) { tab in
+                item(tab)
             }
-            .padding(5)
-            .sheepGlassTabBarChrome()
-            .sensoryFeedback(.selection, trigger: selection)
         }
+        .padding(5)
+        .background { Color.clear.sheepGlassTabBarChrome() }
+        .sensoryFeedback(.selection, trigger: selection)
+        .accessibilityElement(children: .contain)
     }
 
     private func item(_ tab: HomeTab) -> some View {
@@ -65,6 +67,7 @@ struct TabBar: View {
         .accessibilityLabel(Self.title(tab))
         .accessibilityIdentifier("tab.\(tab.rawValue)")
         .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityRespondsToUserInteraction(true)
     }
 
     static func title(_ tab: HomeTab) -> String {
