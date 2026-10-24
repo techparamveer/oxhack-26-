@@ -55,13 +55,14 @@ struct InterventionOverlay: View {
         .accessibilityAddTraits(.isModal)
     }
 
-    /// Dark-to-transparent scrim — the one gradient the design allows. The page stays visible at the
-    /// top; text and buttons sit on the near-opaque lower part.
+    /// Dark scrim — the one gradient the design allows, and only at the very top edge (a hint of the page
+    /// under the status bar). Everything from ~12 % down is opaque so the copy is crisp on any page
+    /// (cookie sheets, thumbnails, white feeds).
     private var scrim: some View {
         LinearGradient(stops: [
-            .init(color: Self.scrimColor.opacity(0.2), location: 0),
-            .init(color: Self.scrimColor.opacity(0.93), location: 0.3),
-            .init(color: Self.scrimColor.opacity(0.97), location: 1)
+            .init(color: Self.scrimColor.opacity(0.6), location: 0),
+            .init(color: Self.scrimColor, location: 0.12),
+            .init(color: Self.scrimColor, location: 1)
         ], startPoint: .top, endPoint: .bottom)
     }
 

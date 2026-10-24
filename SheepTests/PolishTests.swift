@@ -214,6 +214,12 @@ final class PolishTests: XCTestCase {
         XCTAssertNil(RestBrief.message(events: restOnly, mutedApps: [], rest: nil, fast: false, now: at(18, 0)))
     }
 
+    func testEmptyScoreCaption() {
+        XCTAssertEqual(ScoreHeader.caption(score: 72, yesterday: 40), "today's score")
+        XCTAssertEqual(ScoreHeader.caption(score: nil, yesterday: 40), "yesterday's score")
+        XCTAssertEqual(ScoreHeader.caption(score: nil, yesterday: nil), "no score yet")
+    }
+
     // MARK: 7 · Nudge template outside Focus
 
     func testNudgeTemplateSendsNAWithoutFocusSession() {

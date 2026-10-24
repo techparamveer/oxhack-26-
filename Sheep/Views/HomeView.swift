@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var score = DayScore()
     @State private var delta: Int?
     @State private var restBrief: HomeMessage?
+    @State private var yesterdayTotal: Int?
     @State private var hapticTick = 0
     private var brief = DailyBriefService.shared
 
@@ -51,7 +52,7 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     header
                     hero
-                    ScoreHeader(mode: displayMode, score: score.total, delta: delta)
+                    ScoreHeader(mode: displayMode, score: score.total, delta: delta, yesterday: yesterdayTotal)
                         .padding(.top, 6)
                     ModePills(selection: pillSelection, scores: score, onSelect: select)
                         .padding(.top, 16)
@@ -119,6 +120,8 @@ struct HomeView: View {
         withAnimation(Theme.spring) {
             score = result.score
             delta = result.delta
+            yesterdayTotal = Calendar.current.date(byAdding: .day, value: -1, to: .now)
+                .flatMap { DayScore.compute(events: events, day: $0).total }
             restBrief = RestBrief.message(events: events, mutedApps: MutedAppsList.apps(),
                                           rest: state.restSession, fast: state.fastTimers)
         }
