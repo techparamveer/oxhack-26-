@@ -37,7 +37,7 @@ struct RootView: View {
     var body: some View {
         @Bindable var router = router
         NavigationStack(path: $router.path) {
-            HomeView()
+            RootTabContent()
                 .navigationDestination(for: Route.self) { route in
                     switch route {
                     case .focusIntake: FocusIntakeView()
@@ -57,6 +57,9 @@ struct RootView: View {
         }
         .sheet(isPresented: $router.showDevMenu) {
             DevMenuView()
+        }
+        .sheet(isPresented: $router.showSettings) {
+            SettingsView()
         }
     }
 }

@@ -5,6 +5,7 @@ import UIKit
 /// and lists the deep links. One primary action: open the Shortcuts app.
 struct SetupView: View {
     @State private var copied: URL?
+    @State private var done = ShortcutsDone.ids()
 
     private static let links: [URL] =
         WrappedApp.allCases.map(DeepLink.open) + Mode.selectable.map(DeepLink.mode)
@@ -38,6 +39,12 @@ struct SetupView: View {
                         Caption("Tap to copy. Any shortcut can open these.")
                     }
                     divider
+                    SectionLabel("I’ve set these up")
+                        .padding(.bottom, Theme.space(1))
+                    doneToggle(ShortcutsDone.openInSheep, "Instagram opens Sheep")
+                    Hairline()
+                    doneToggle(ShortcutsDone.restSilences, "Rest silences work")
+                    divider
                     Caption("Real blocking of native apps needs Apple’s Screen Time API — that’s the production version.")
                 }
                 .padding(.vertical, Theme.space(3))
@@ -52,6 +59,16 @@ struct SetupView: View {
                 .background(Theme.background)
             }
         }
+    }
+
+    /// Marks a shortcut as set up (Settings › Shortcuts setup shows "n of 2 on").
+    private func doneToggle(_ id: String, _ title: String) -> some View {
+        Toggle(isOn: Binding(get: { done.contains(id) },
+                             set: { done = ShortcutsDone.set(id, on: $0) })) {
+            Text(title).font(Theme.rowTitle).foregroundStyle(Theme.text)
+        }
+        .tint(Theme.focusAccent)   // same tint as Settings' toggle
+        .frame(minHeight: 52)
     }
 
     private var divider: some View {
@@ -112,5 +129,26 @@ struct SetupView: View {
             try? await Task.sleep(for: .seconds(1.5))
             if copied == url { withAnimation(Theme.spring) { copied = nil } }
         }
+    }
+}
+
+/// Which Shortcut automations the user has marked as set up, stored under `sheep.shortcutsDone`
+/// (read by Settings › Shortcuts setup via `SheepSettings.shortcutsDoneCount`).
+enum ShortcutsDone {
+    static let openInSheep = "openInSheep"
+    static let restSilences = "restSilences"
+    static let all = [openInSheep, restSilences]
+
+    static func ids(defaults: UserDefaults = .standard) -> [String] {
+        defaults.stringArray(forKey: SheepSettings.Key.shortcutsDone) ?? []
+    }
+
+    /// Turns `id` on/off and returns the stored ids (canonical order, no duplicates).
+    @discardableResult
+    static func set(_ id: String, on: Bool, defaults: UserDefaults = .standard) -> [String] {
+        let current = ids(defaults: defaults)
+        let next = all.filter { $0 == id ? on : current.contains($0) }
+        defaults.set(next, forKey: SheepSettings.Key.shortcutsDone)
+        return next
     }
 }

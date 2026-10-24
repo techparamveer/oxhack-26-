@@ -7,12 +7,22 @@ enum Route: Hashable {
     case notebookFile(String)
 }
 
+/// Root tabs shown in the floating tab bar (only at the navigation root).
+enum HomeTab: String, CaseIterable, Identifiable {
+    case home, apps, notebook
+    var id: String { rawValue }
+}
+
 /// Navigation for the single NavigationStack on Home, plus the full-screen wrapper.
 @Observable
 final class Router {
     var path: [Route] = []
     var presentedWrapper: WrappedApp?
     var showDevMenu = false
+    /// Root tab picked in the floating tab bar.
+    var tab: HomeTab = .home
+    /// Settings sheet (gear on Home).
+    var showSettings = false
 
     func push(_ route: Route) { path.append(route) }
     func replaceTop(with route: Route) {
