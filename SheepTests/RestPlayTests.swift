@@ -7,8 +7,13 @@ final class RestPlayTests: XCTestCase {
     private var originalRoot: URL!
     private var suiteName: String!
     private var defaults: UserDefaults!
+    private var spy: SpyNotifier!
+    private var originalNotifier: LimitNotifier!
 
     override func setUp() async throws {
+        spy = SpyNotifier()
+        originalNotifier = RestController.notifier
+        RestController.notifier = spy
         tmp = FileManager.default.temporaryDirectory.appendingPathComponent("restplay-\(UUID())", isDirectory: true)
         originalRoot = AppPaths.root
         AppPaths.root = tmp
@@ -17,6 +22,8 @@ final class RestPlayTests: XCTestCase {
     }
 
     override func tearDown() async throws {
+        RestController.notifier = originalNotifier
+        StubGemini.reply = nil
         AppPaths.root = originalRoot
         defaults.removePersistentDomain(forName: suiteName)
         try? FileManager.default.removeItem(at: tmp)
@@ -162,10 +169,98 @@ final class RestPlayTests: XCTestCase {
 
     func testStartRestPersistsAndSetsMode() {
         let state = AppState(defaults: defaults)
-        RestController.startRest(activity: "  Netflix ", limitMinutes: 45, state: state)
+        RestController.startRest(activity: "  Netflix ", limitMinutes: 45, state: state, client: GeminiClient(apiKey: ""))
         XCTAssertEqual(state.restSession?.activity, "Netflix")
         XCTAssertEqual(state.mode, .rest)
         XCTAssertEqual(AppState(defaults: defaults).restSession?.limitMinutes, 45)
         RestController.endRest(state: state, log: EventLog(fileURL: { self.tmp.appendingPathComponent("e.jsonl") }))
     }
+
+    // MARK: Overuse notification
+
+    private var offline: GeminiClient { GeminiClient(apiKey: "") }
+    private var live: GeminiClient {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StubGemini.self]
+        return GeminiClient(apiKey: "test-key", model: "stub", session: URLSession(configuration: config))
+    }
+
+    func testOfflineSchedulesFallbackOnceAndEndClearsIt() async {
+        let state = AppState(defaults: defaults)
+        let task = RestController.startRest(activity: "Netflix", limitMinutes: 45, state: state, client: offline)
+        await task.value
+        XCTAssertEqual(spy.scheduled.count, 1, "offline: only the fallback, no re-schedule")
+        XCTAssertEqual(spy.scheduled.first?.id, RestController.restNotificationID)
+        XCTAssertTrue(spy.scheduled.first?.body.contains("50 min of netflix") ?? false)
+        XCTAssertEqual(spy.scheduled.first?.after ?? 0, 20, accuracy: 1)
+        RestController.endRest(state: state, log: EventLog(fileURL: { self.tmp.appendingPathComponent("e.jsonl") }))
+        XCTAssertEqual(spy.cleared, [RestController.restNotificationID])
+    }
+
+    func testGeminiTextReplacesFallbackUnderSameID() async {
+        StubGemini.reply = #"{"title":"pause netflix?","body":"50 min in. stretch."}"#
+        let state = AppState(defaults: defaults)
+        await RestController.startRest(activity: "Netflix", limitMinutes: 45, state: state, client: live).value
+        XCTAssertEqual(spy.scheduled.count, 2)
+        XCTAssertEqual(Set(spy.scheduled.map(\.id)), [RestController.restNotificationID], "same id → replaces, never a second banner")
+        XCTAssertEqual(spy.scheduled.last?.title, "pause netflix?")
+    }
+
+    func testGeminiTextDroppedIfRestEndedFirst() async {
+        StubGemini.reply = #"{"title":"pause netflix?","body":"50 min in. stretch."}"#
+        let state = AppState(defaults: defaults)
+        let task = RestController.startRest(activity: "Netflix", limitMinutes: 45, state: state, client: live)
+        RestController.endRest(state: state, log: EventLog(fileURL: { self.tmp.appendingPathComponent("e.jsonl") }))
+        await task.value
+        XCTAssertEqual(spy.scheduled.count, 1, "late Gemini text must not resurrect a cancelled notification")
+        XCTAssertEqual(spy.cleared, [RestController.restNotificationID])
+    }
+
+    func testEndRestTwiceAwardsXPOnce() {
+        let log = EventLog(fileURL: { self.tmp.appendingPathComponent("events.jsonl") })
+        let state = AppState(defaults: defaults)
+        state.fastTimers = false
+        let start = Date()
+        state.restSession = RestSession(activity: "Walk", limitMinutes: 30, startedAt: start)
+        RestController.endRest(state: state, now: start.addingTimeInterval(600), log: log)
+        XCTAssertEqual(RestController.endRest(state: state, now: start.addingTimeInterval(601), log: log), 0)
+        XCTAssertEqual(state.progress.xp, XPRules.underLimit)
+        XCTAssertEqual(log.readAll().count, 1)
+    }
+
+    func testPlayStartSchedulesAndEndClears() {
+        let state = AppState(defaults: defaults)
+        RestController.startPlay(limitMinutes: 60, state: state)
+        XCTAssertEqual(spy.scheduled.map(\.id), [RestController.playNotificationID])
+        XCTAssertEqual(spy.scheduled.first?.after, 20)
+        RestController.endPlay(state: state, log: EventLog(fileURL: { self.tmp.appendingPathComponent("e.jsonl") }))
+        XCTAssertEqual(spy.cleared, [RestController.playNotificationID])
+    }
+}
+
+final class SpyNotifier: LimitNotifier {
+    struct Call { var id, title, body: String; var after: TimeInterval }
+    var scheduled: [Call] = []
+    var cleared: [String] = []
+    func schedule(id: String, title: String, body: String, after seconds: TimeInterval) {
+        scheduled.append(Call(id: id, title: title, body: body, after: seconds))
+    }
+    func clear(id: String) { cleared.append(id) }
+}
+
+/// Answers every Gemini request with `reply` wrapped in a generateContent envelope.
+final class StubGemini: URLProtocol {
+    nonisolated(unsafe) static var reply: String?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let text = Self.reply ?? ""
+        let envelope: [String: Any] = ["candidates": [["content": ["parts": [["text": text]]]]]]
+        let data = try! JSONSerialization.data(withJSONObject: envelope)
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }
