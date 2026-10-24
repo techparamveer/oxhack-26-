@@ -24,17 +24,23 @@ struct HomeView: View {
 
     private var running: HomePrimary.Running {
         HomePrimary.Running(focus: state.activeSession != nil,
-                            rest: state.mode == .rest || (state.restSession != nil && state.restSession?.endedAt == nil),
-                            play: state.mode == .play || (state.playSession != nil && state.playSession?.endedAt == nil))
+                            rest: state.restSession != nil && state.restSession?.endedAt == nil,
+                            play: state.playSession != nil && state.playSession?.endedAt == nil)
     }
 
+    private var plan: HomePrimary.Plan { HomePrimary.plan(for: selection, running: running) }
+
     private var message: HomeMessage {
-        // The daily brief is about the day (focus-led); other pills explain how to start that mode.
-        if selection == defaultSelection,
+        // The daily brief is about the day (focus-led): shown when nothing runs and Focus is the pick.
+        // Otherwise the card explains the button (how to start, or how to get back to the running mode).
+        if running == HomePrimary.Running(), plan.mode == .focus,
            let message = HomeMessage.brief(headline: brief.headline, body: brief.body, isFromMemory: brief.isFromMemory) {
             return message
         }
-        return .howTo(for: selection, running: running.isRunning(selection))
+        // Follow the button (a running Focus keeps it on "Back to focus"), so card and button agree.
+        var message = HomeMessage.howTo(for: plan.mode, running: running.isRunning(plan.mode))
+        if let end = plan.end { message.body += " Starting ends your \(end == .play ? "play" : "rest")." }
+        return message
     }
 
     var body: some View {
@@ -51,8 +57,7 @@ struct HomeView: View {
                         .padding(.horizontal, Theme.cardMargin)
                         .padding(.top, 20)
                     Spacer(minLength: 16)
-                    PrimaryButton(title: HomePrimary.title(for: selection, running: running),
-                                  accent: selection.accent, icon: "play.fill", action: start)
+                    PrimaryButton(title: plan.title, accent: plan.mode.accent, icon: "play.fill", action: start)
                         .padding(.bottom, 14)
                 }
                 .frame(maxWidth: .infinity, minHeight: geo.size.height)
@@ -65,7 +70,11 @@ struct HomeView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: hapticTick)
         .onAppear(perform: recompute)
         .onChange(of: state.progress.xp) { recompute() }
-        .onChange(of: state.mode) { recompute() }
+        .onChange(of: state.mode) {
+            picked = nil   // a mode started or ended: pills follow the running mode again
+            recompute()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .memoryDidChange)) { _ in recompute() }
         .task { await brief.loadIfNeeded() }
     }
 
@@ -99,13 +108,19 @@ struct HomeView: View {
 
     private func start() {
         hapticTick += 1
-        switch HomePrimary.route(for: selection, running: running) {
-        case .focusSession: router.push(.focusSession)
-        case .focusIntake: router.push(.focusIntake)
-        case .rest: state.setMode(.rest); router.push(.rest)
-        case .play: state.setMode(.play); router.push(.play)
+        let plan = plan
+        // Switching between Rest and Play (or to Focus) ends the running one cleanly first.
+        switch plan.end {
+        case .rest: RestController.endRest(state: state)
+        case .play: RestController.endPlay(state: state)
         default: break
         }
+        switch plan.route {
+        case .rest: state.setMode(.rest)
+        case .play: state.setMode(.play)
+        default: break
+        }
+        router.push(plan.route)
     }
 
     private func recompute() {
@@ -118,6 +133,11 @@ struct HomeView: View {
 }
 
 /// Primary-button logic for Home, kept pure for tests.
+///
+/// - A running Focus session is never ended from Home: the button stays "Back to focus" whatever pill
+///   is picked (other pills only preview).
+/// - Starting a mode while a *different* Rest/Play session runs ends that session first (via
+///   `RestController`, so it logs its event and clears its notification).
 enum HomePrimary {
     struct Running: Equatable {
         var focus = false
@@ -134,19 +154,41 @@ enum HomePrimary {
         }
     }
 
-    static func title(for mode: Mode, running: Running) -> String {
-        switch mode {
-        case .focus, .idle: running.focus ? "Back to focus" : "Start focus"
-        case .rest: running.rest ? "Back to rest" : "Start rest"
-        case .play: running.play ? "Back to play" : "Start playing"
-        }
+    struct Plan: Equatable {
+        /// Mode the button acts on (its accent and the card copy follow it).
+        var mode: Mode
+        var title: String
+        /// Running Rest/Play session to end before pushing `route`.
+        var end: Mode?
+        var route: Route
     }
 
-    static func route(for mode: Mode, running: Running) -> Route {
+    static func plan(for selection: Mode, running: Running) -> Plan {
+        if running.focus {
+            return Plan(mode: .focus, title: "Back to focus", end: nil, route: .focusSession)
+        }
+        let mode: Mode = selection == .idle ? .focus : selection
+        if running.isRunning(mode) {
+            return Plan(mode: mode, title: "Back to \(mode == .play ? "play" : mode.title.lowercased())",
+                        end: nil, route: route(mode, running: running))
+        }
+        let end: Mode? = running.rest ? .rest : (running.play ? .play : nil)
+        let title = switch mode {
+        case .rest: "Start rest"
+        case .play: "Start playing"
+        default: "Start focus"
+        }
+        return Plan(mode: mode, title: title, end: end, route: route(mode, running: running))
+    }
+
+    static func title(for mode: Mode, running: Running) -> String { plan(for: mode, running: running).title }
+    static func route(for mode: Mode, running: Running) -> Route { plan(for: mode, running: running).route }
+
+    private static func route(_ mode: Mode, running: Running) -> Route {
         switch mode {
-        case .focus, .idle: running.focus ? .focusSession : .focusIntake
         case .rest: .rest
         case .play: .play
+        default: running.focus ? .focusSession : .focusIntake
         }
     }
 }

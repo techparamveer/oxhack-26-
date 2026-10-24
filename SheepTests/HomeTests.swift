@@ -192,8 +192,51 @@ final class HomePrimaryTests: XCTestCase {
         XCTAssertEqual(HomePrimary.title(for: .focus, running: .init(focus: true)), "Back to focus")
         XCTAssertEqual(HomePrimary.title(for: .rest, running: .init(rest: true)), "Back to rest")
         XCTAssertEqual(HomePrimary.title(for: .play, running: .init(play: true)), "Back to play")
-        // A running focus session doesn't change the Rest pill's button.
-        XCTAssertEqual(HomePrimary.title(for: .rest, running: .init(focus: true)), "Start rest")
+        // A running Focus session is never ended from Home: other pills only preview.
+        XCTAssertEqual(HomePrimary.title(for: .rest, running: .init(focus: true)), "Back to focus")
+        XCTAssertEqual(HomePrimary.title(for: .play, running: .init(focus: true)), "Back to focus")
+    }
+
+    func testFocusRunningKeepsBackToFocusAndEndsNothing() {
+        for pick in Mode.allCases {
+            let plan = HomePrimary.plan(for: pick, running: .init(focus: true))
+            XCTAssertEqual(plan, .init(mode: .focus, title: "Back to focus", end: nil, route: .focusSession), "\(pick)")
+        }
+    }
+
+    func testSwitchingBetweenRestAndPlayEndsTheOtherFirst() {
+        XCTAssertEqual(HomePrimary.plan(for: .rest, running: .init(play: true)),
+                       .init(mode: .rest, title: "Start rest", end: .play, route: .rest))
+        XCTAssertEqual(HomePrimary.plan(for: .play, running: .init(rest: true)),
+                       .init(mode: .play, title: "Start playing", end: .rest, route: .play))
+        XCTAssertEqual(HomePrimary.plan(for: .focus, running: .init(rest: true)),
+                       .init(mode: .focus, title: "Start focus", end: .rest, route: .focusIntake))
+        // Same mode running: just go back to it, nothing ends.
+        XCTAssertEqual(HomePrimary.plan(for: .rest, running: .init(rest: true)),
+                       .init(mode: .rest, title: "Back to rest", end: nil, route: .rest))
+        XCTAssertNil(HomePrimary.plan(for: .idle, running: .init()).end)
+    }
+
+    func testFirstDayBriefDoesNotRepeatCaption() {
+        let noon = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: .now)!
+        let msg = HomeMessage.brief(headline: "How to start", body: "Tap Focus.", isFromMemory: false, now: noon)
+        XCTAssertEqual(msg?.headline, "Morning. Ready to lock in?")
+        XCTAssertEqual(msg?.caption, "How to start")
+        XCTAssertEqual(HomeMessage.brief(headline: "Lock in.", body: "x", isFromMemory: true)?.caption, "Sheep says")
+    }
+
+    func testShortcutsDoneWritesTheKeySettingsReads() {
+        let name = "sheep.tests.shortcuts.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        XCTAssertEqual(SheepSettings(defaults: defaults).shortcutsDoneCount, 0)
+        ShortcutsDone.set(ShortcutsDone.restSilences, on: true, defaults: defaults)
+        ShortcutsDone.set(ShortcutsDone.openInSheep, on: true, defaults: defaults)
+        ShortcutsDone.set(ShortcutsDone.openInSheep, on: true, defaults: defaults)
+        XCTAssertEqual(ShortcutsDone.ids(defaults: defaults), [ShortcutsDone.openInSheep, ShortcutsDone.restSilences])
+        XCTAssertEqual(SheepSettings(defaults: defaults).shortcutsDoneCount, 2)
+        ShortcutsDone.set(ShortcutsDone.openInSheep, on: false, defaults: defaults)
+        XCTAssertEqual(SheepSettings(defaults: defaults).shortcutsDoneCount, 1)
     }
 
     func testRoutes() {

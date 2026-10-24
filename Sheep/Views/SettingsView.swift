@@ -74,6 +74,7 @@ struct SettingsView: View {
             .scrollIndicators(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { settings.reload() }   // also on pop back (e.g. after marking Shortcuts done)
             .buttonStyle(.plain)
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
@@ -93,7 +94,6 @@ struct SettingsView: View {
         }
         .tint(Theme.text)
         .presentationBackground(Theme.background)
-        .onAppear { settings.reload() }
     }
 
     private var header: some View {
@@ -110,6 +110,8 @@ struct SettingsView: View {
     }
 
     private func forgetEverything() {
+        RestController.notifier.clear(id: RestController.restNotificationID)   // no banner for a wiped session
+        RestController.notifier.clear(id: RestController.playNotificationID)
         MemoryReset.forgetEverything()   // memory files, event log (scores), brief cache
         state.resetAll()                 // XP, mode, sessions
         router.popToRoot()
