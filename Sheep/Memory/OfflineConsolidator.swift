@@ -534,11 +534,16 @@ enum Learned {
         // Nudge tones (cumulative, from what-works).
         let freshTones = Set(fresh.filter { $0.type == .nudge && $0.outcome != nil }.map { ($0.tone ?? "unknown").lowercased() })
         let tones = works.byTone.filter { freshTones.contains($0.tone) }
+        // These are all-time counts, so the line names its scope ("Across the last two days, …") — otherwise it
+        // reads as contradicting the Congrats summary, which counts this session only.
+        func scoped(_ t: (tone: String, back: Int, total: Int)) -> String {
+            toneLine(t.tone, t.back, t.total, scope: toneScope(t.tone, total: t.total, all: all, now: now, calendar: calendar))
+        }
         if let best = tones.first(where: { $0.back > 0 }) {
-            out.append(toneLine(best.tone, best.back, best.total))
+            out.append(scoped(best))
         }
         if let worst = tones.last(where: { $0.back < $0.total }), worst.tone != tones.first(where: { $0.back > 0 })?.tone {
-            out.append(toneLine(worst.tone, worst.back, worst.total))
+            out.append(scoped(worst))
         }
 
         // Late-night slip.
@@ -556,11 +561,30 @@ enum Learned {
         return Array(out.prefix(3))
     }
 
-    static func toneLine(_ tone: String, _ back: Int, _ total: Int) -> String {
+    /// `scope` prefixes multi-nudge counts: "Across the last two days, firm nudges got you back 1 of 2 times."
+    static func toneLine(_ tone: String, _ back: Int, _ total: Int, scope: String? = nil) -> String {
         let t = MemoryText.tone(tone)
         if total == 1 {
             return back == 1 ? "A \(tone) nudge got you back. Noted for next time." : "A \(tone) nudge got ignored — trying another tone next time."
         }
-        return "\(t) nudges got you back \(back) of \(total) times."
+        guard let scope else { return "\(t) nudges got you back \(back) of \(total) times." }
+        return "\(scope), \(tone) nudges got you back \(back) of \(total) times."
+    }
+
+    /// Honest time span behind a tone's cumulative count: "Today" / "Across the last two days" / "Across the
+    /// last 9 days" when every counted nudge is still in the event log; "So far" when some came from older,
+    /// pruned history (what-works keeps counts the log no longer has).
+    static func toneScope(_ tone: String, total: Int, all: [SheepEvent], now: Date, calendar: Calendar) -> String {
+        let logged = all.filter {
+            $0.type == .nudge && ($0.outcome == "returned" || $0.outcome == "ignored") && ($0.tone ?? "unknown").lowercased() == tone
+        }
+        guard logged.count == total, let first = logged.map(\.ts).min() else { return "So far" }
+        let days = (calendar.dateComponents([.day], from: calendar.startOfDay(for: first),
+                                            to: calendar.startOfDay(for: now)).day ?? 0) + 1
+        switch days {
+        case ...1: return "Today"
+        case 2...7: return "Across the last \(["two", "three", "four", "five", "six", "seven"][days - 2]) days"
+        default: return "Across the last \(days) days"
+        }
     }
 }

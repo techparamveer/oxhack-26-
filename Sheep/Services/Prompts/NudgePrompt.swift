@@ -35,7 +35,8 @@ struct NudgeInput: Equatable {
     var sessionTitle: String?
     var done: Int
     var total: Int
-    var minutesLeft: Int?
+    /// Seconds left in the current Pomodoro (0 once every planned Pomodoro has elapsed); nil outside Focus.
+    var secondsLeft: Int?
     var restActivity: String?
     var restLimitMinutes: Int?
     var now: Date
@@ -86,7 +87,7 @@ enum NudgePrompt {
         MODE: \(input.mode.rawValue)
         APP: \(input.app.rawValue)  SECTION: \(input.section.rawValue)
         SCROLLED: \(minutesString(input.activeMinutes)) min continuous, \(input.nudgesThisSession) nudges already this session
-        SESSION GOAL: \(goalLine(input)) — checklist \(checklistLine(input)) done, \(input.minutesLeft.map(String.init) ?? "n/a") min left in Pomodoro
+        SESSION GOAL: \(goalLine(input)) — checklist \(checklistLine(input)) done, \(promptTimeLeft(input.secondsLeft)) left in Pomodoro
         NOW: \(PromptClock.time(input.now))\(input.voice == .gentle ? "\nVOICE: gentle" : "")
         MEMORY:
         \(memory)
@@ -113,7 +114,7 @@ enum NudgePrompt {
         switch input.mode {
         case .focus:
             let goal = input.sessionTitle.map { "“\($0)”" } ?? "your focus session"
-            let left = input.minutesLeft.map { " \($0) min left in this pomodoro." } ?? ""
+            let left = fallbackTimeLeft(input.secondsLeft)
             if input.voice == .gentle {
                 return Nudge(headline: "a little check-in",
                              message: "\(scrolled) on \(place). \(goal) is still there when you're ready.\(left)",
@@ -181,12 +182,32 @@ enum NudgePrompt {
         return "none"
     }
 
-    /// Minutes left in the current Pomodoro (rounded up), 0 once all planned Pomodoros have elapsed.
-    static func minutesLeftInPomodoro(_ session: FocusSession, now: Date) -> Int {
+    /// Seconds left in the current Pomodoro (rounded up), 0 once all planned Pomodoros have elapsed.
+    static func secondsLeftInPomodoro(_ session: FocusSession, now: Date) -> Int {
         let pomo = Double(max(1, session.pomodoroMinutes)) * 60
         let elapsed = max(0, now.timeIntervalSince(session.startedAt))
         guard elapsed < pomo * Double(max(1, session.pomodoros)) else { return 0 }
         let left = pomo - elapsed.truncatingRemainder(dividingBy: pomo)
-        return Int((left / 60).rounded(.up))
+        return Int(left.rounded(.up))
+    }
+
+    /// Whole minutes for display, rounded to the nearest minute; nil under a minute ("under a minute").
+    static func displayMinutes(secondsLeft: Int) -> Int? {
+        secondsLeft < 60 ? nil : Int((Double(secondsLeft) / 60).rounded())
+    }
+
+    /// Prompt template value: "12 min", "under a minute", "0 min" (time's up), "n/a min" outside Focus.
+    static func promptTimeLeft(_ secondsLeft: Int?) -> String {
+        guard let secondsLeft else { return "n/a min" }
+        if secondsLeft <= 0 { return "0 min" }
+        return displayMinutes(secondsLeft: secondsLeft).map { "\($0) min" } ?? "under a minute"
+    }
+
+    /// Fallback sentence: " 12 min left in this pomodoro." / " Under a minute left in this pomodoro.";
+    /// empty outside Focus or once the planned Pomodoros are over.
+    static func fallbackTimeLeft(_ secondsLeft: Int?) -> String {
+        guard let secondsLeft, secondsLeft > 0 else { return "" }
+        guard let minutes = displayMinutes(secondsLeft: secondsLeft) else { return " Under a minute left in this pomodoro." }
+        return " \(minutes) min left in this pomodoro."
     }
 }

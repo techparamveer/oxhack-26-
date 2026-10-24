@@ -83,7 +83,7 @@ enum ReflectionPrompt {
             nextStep = "Try one Pomodoro with just the first item."
         }
         if s.nudgeCount > 0 {
-            summary += " \(s.nudgesResisted) of \(s.nudgeCount) nudges resisted."
+            summary += " \(s.nudgesResisted) of \(s.nudgeCount) nudges resisted this session."
             bonus += min(15, s.nudgesResisted * 5)
         }
         if scrolled {
