@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum Route: Hashable {
-    case focusIntake, focusSession, congrats, rest, play, notebook, setup
+    case focusIntake, focusSession, congrats, rest, play, notebook, setup, homeScreenIcons
     /// One memory file in Sheep's Notebook (path relative to the memory root).
     case notebookFile(String)
 }
