@@ -114,7 +114,7 @@ enum AppsCaption {
         probes(for: app).filter { !isAllowed(app, $0.1, mode) }.map(\.0)
     }
 
-    /// "Reels and DMs hidden" in the current mode; when idle, previews Focus ("In Focus: Shorts hidden").
+    /// "Reels and Explore hidden" in the current mode; when idle, previews Focus ("In Focus: Shorts hidden").
     static func wrapped(app: WrappedApp, mode: Mode,
                         isAllowed: (WrappedApp, String, Mode) -> Bool = { Policy.isAllowed(app: $0, path: $1, mode: $2) }) -> String {
         let effective = mode == .idle ? Mode.focus : mode

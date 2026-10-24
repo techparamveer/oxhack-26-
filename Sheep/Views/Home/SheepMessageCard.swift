@@ -37,7 +37,7 @@ struct HomeMessage: Equatable {
         case (.play, true):
             (headline, body) = ("You're playing.", "Tap Back to play to see your limit. Stop on time to earn XP.")
         case (.rest, false):
-            (headline, body) = ("Rest on purpose.", "Pick something restful and a time limit. DMs open up; I'll only nudge if you overrun.")
+            (headline, body) = ("Rest on purpose.", "Pick something restful and a time limit. I'll only nudge if you overrun.")
         case (.play, false):
             (headline, body) = ("Play, then stop on time.", "Set a play limit. Work apps stay muted; you earn XP for stopping on time.")
         default:

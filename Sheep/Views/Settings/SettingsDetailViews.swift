@@ -50,7 +50,7 @@ struct HiddenByModeView: View {
     private var footer: String {
         switch mode {
         case .focus:
-            "Hidden inside Sheep's Instagram and YouTube while you focus."
+            "Hidden inside Sheep's Instagram and YouTube while you focus. Messages stay open unless you tick DMs."
         case .rest:
             "Rest hides nothing by default."
         case .play:
