@@ -34,11 +34,10 @@ struct SheepApp: App {
                 .consumesIntentRoutes(router: router, state: state)
                 .debugLaunchHooks(state: state, router: router)   // DEBUG-only launch args (Sheep/Debug)
                 .task {
-                    // Permission in parallel with rollover so the Allow sheet still lands inside
-                    // the acceptance test's first-launch alert window.
-                    async let auth: Void = NotificationService.shared.requestAuthorization()
+                    // Rollover even while the permission alert (asked once, in `SheepAppDelegate`)
+                    // keeps the scene `.inactive`. A second concurrent request raced the first on a
+                    // fresh install and left the app "not authorized" despite Allow.
                     DailyRollover.handleActive()
-                    await auth
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in
                     if phase == .active {
