@@ -61,6 +61,33 @@ final class NotebookTests: XCTestCase {
         XCTAssertEqual(doc.body, text)
     }
 
+    func testCRLFHeaderIsParsed() {
+        let doc = MemoryDocument("---\r\nid: day\r\nupdated: 2026-10-23\r\n---\r\n# Day\r\n- one")
+        XCTAssertEqual(doc.id, "day")
+        XCTAssertEqual(doc.updated, "2026-10-23")
+        XCTAssertEqual(doc.body, "# Day\n- one")
+    }
+
+    // MARK: Path safety + routing
+
+    func testOnlyRelativeMarkdownPathsInsideMemoryRootAreSafe() {
+        for ok in ["profile.md", "timeline/daily/2026-10-23.md", "workstreams/active/ch3.md"] {
+            XCTAssertTrue(NotebookModel.isSafeMemoryPath(ok), ok)
+        }
+        for bad in ["", "/etc/passwd.md", "~/x.md", "../escape.md", "knowledge/../../escape.md",
+                    "./profile.md", "a//b.md", "history/2026/profile.md", "events.jsonl", "notes.txt",
+                    "..\\escape.md"] {
+            XCTAssertFalse(NotebookModel.isSafeMemoryPath(bad), bad)
+        }
+    }
+
+    func testOpeningAFileGoesThroughTheRouter() {
+        let router = Router()
+        router.push(.notebook)
+        router.push(.notebookFile("profile.md"))
+        XCTAssertEqual(router.path, [.notebook, .notebookFile("profile.md")])
+    }
+
     // MARK: Titles + dates
 
     func testDailyTitleFormatting() {

@@ -12,18 +12,25 @@ struct NotebookFileView: View {
     @FocusState private var editorFocused: Bool
 
     private var document: MemoryDocument { MemoryDocument(content) }
+    private var isSafe: Bool { NotebookModel.isSafeMemoryPath(path) }
 
     var body: some View {
         Screen(title: NotebookModel.title(path: path, document: document)) {
             VStack(alignment: .leading, spacing: 0) {
-                if isEditing { editor } else { reader }
-                Hairline()
-                actions
-                    .padding(.vertical, Theme.space(1))
+                if !isSafe {
+                    Caption("This note isn't available.")
+                        .padding(.vertical, Theme.space(2))
+                    Spacer()
+                } else {
+                    if isEditing { editor } else { reader }
+                    Hairline()
+                    actions
+                        .padding(.vertical, Theme.space(1))
+                }
             }
         }
         .onAppear {
-            content = MemoryStore.shared.read(path) ?? ""
+            content = isSafe ? (MemoryStore.shared.read(path) ?? "") : ""
         }
         .animation(Theme.spring, value: isEditing)
         .animation(Theme.spring, value: confirmingDelete)
@@ -102,6 +109,7 @@ struct NotebookFileView: View {
     }
 
     private func save() {
+        guard isSafe else { return }
         MemoryStore.shared.write(path, content: draft)
         content = MemoryStore.shared.read(path) ?? draft
         editorFocused = false
@@ -109,6 +117,7 @@ struct NotebookFileView: View {
     }
 
     private func delete() {
+        guard isSafe else { return }
         MemoryStore.shared.delete(path)
         dismiss()
     }

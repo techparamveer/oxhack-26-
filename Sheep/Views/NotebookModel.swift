@@ -7,14 +7,14 @@ struct MemoryDocument: Equatable {
     var body: String
 
     init(_ content: String) {
-        var text = content
+        var text = content.replacingOccurrences(of: "\r\n", with: "\n")
         if text.hasPrefix("\u{FEFF}") { text.removeFirst() }
         let lines = text.components(separatedBy: "\n")
         guard let first = lines.first, first.trimmingCharacters(in: .whitespaces) == "---",
               let end = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" })
         else {
             fields = [:]
-            body = content
+            body = text
             return
         }
         var parsed: [String: String] = [:]
@@ -78,6 +78,18 @@ struct NotebookGroup: Identifiable, Equatable {
 
 /// Pure grouping / titling logic for Sheep's Notebook (testable without UI).
 enum NotebookModel {
+    /// True if `path` is a plain relative `.md` path that stays inside the memory root
+    /// (no absolute paths, `~`, `.`/`..` components or `history/` snapshots). The Notebook never
+    /// reads, writes or deletes anything else, whatever `Route.notebookFile` it is handed.
+    static func isSafeMemoryPath(_ path: String, root: URL = AppPaths.memory) -> Bool {
+        guard !path.isEmpty, !path.hasPrefix("/"), !path.hasPrefix("~"), !path.contains("\\"),
+              path.lowercased().hasSuffix(".md"), !path.hasPrefix("history/") else { return false }
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+        guard !parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else { return false }
+        let base = root.standardizedFileURL.path
+        return root.appendingPathComponent(path).standardizedFileURL.path.hasPrefix(base + "/")
+    }
+
     static func section(for path: String) -> NotebookSection {
         if path == "profile.md" { return .about }
         if path.hasPrefix("timeline/daily/") { return .days }
