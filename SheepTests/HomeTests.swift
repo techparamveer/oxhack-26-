@@ -221,6 +221,13 @@ final class SettingsTests: XCTestCase {
 }
 
 final class HomePrimaryTests: XCTestCase {
+    func testHomeTabsAreHomeAppsNotebook() {
+        XCTAssertEqual(HomeTab.allCases.map(\.rawValue), ["home", "apps", "notebook"])
+        XCTAssertEqual(HomeTab.allCases.map(TabBar.title), ["Home", "Apps", "Notebook"])
+        XCTAssertEqual(HomeTab.allCases.map { "tab.\($0.rawValue)" },
+                       ["tab.home", "tab.apps", "tab.notebook"])
+    }
+
     func testTitlesPerModeAndSessionState() {
         let idle = HomePrimary.Running()
         XCTAssertEqual(HomePrimary.title(for: .focus, running: idle), "Start focus")

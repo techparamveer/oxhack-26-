@@ -72,6 +72,9 @@ extension View {
             } else {
                 background(shape.fill(Theme.background))
             }
+        } else {
+            // ViewBuilder `if` without `else` returns EmptyView, which hid Apps and Notebook.
+            self
         }
     }
 }
