@@ -66,6 +66,8 @@ struct GeminiPrompt {
     var temperature: Double
     var timeout: TimeInterval = 3     // consolidator uses 15
     var usePersona = true
+    /// Gemini 3.x thinks by default; `"low"` keeps 3 s prompts in budget. `nil` omits thinkingConfig.
+    var thinkingLevel: String? = "low"
 }
 
 enum GeminiSource: String { case live, fallback }
@@ -122,14 +124,18 @@ final class GeminiClient: @unchecked Sendable {
 
     func requestBody(_ prompt: GeminiPrompt) -> JSONValue {
         let system = prompt.usePersona ? Persona.text + "\n\n" + prompt.system : prompt.system
+        var generationConfig: [String: JSONValue] = [
+            "responseMimeType": "application/json",
+            "responseSchema": prompt.schema.geminiSchema,
+            "temperature": .double(prompt.temperature)
+        ]
+        if let level = prompt.thinkingLevel {
+            generationConfig["thinkingConfig"] = ["thinkingLevel": .string(level)]
+        }
         return [
             "systemInstruction": ["parts": [["text": .string(system)]]],
             "contents": [["role": "user", "parts": [["text": .string(prompt.user)]]]],
-            "generationConfig": [
-                "responseMimeType": "application/json",
-                "responseSchema": prompt.schema.geminiSchema,
-                "temperature": .double(prompt.temperature)
-            ]
+            "generationConfig": .object(generationConfig)
         ]
     }
 

@@ -97,10 +97,21 @@ Deno.test("passes through upstream non-2xx status and body (e.g. 403 API_KEY_SER
 
 Deno.test("rejects models outside the allowlist without calling anything", async () => {
   const { handler, calls } = setup();
-  const res = await handler(req({ ...valid, model: "gemini-2.5-pro" }));
-  assertEquals(res.status, 400);
+  for (const model of ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"]) {
+    const res = await handler(req({ ...valid, model }));
+    assertEquals(res.status, 400, model);
+  }
   assertEquals(calls.length, 0);
-  assertEquals(ALLOWED_MODELS.has("gemini-flash-latest"), true);
+  for (const model of [
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+  ]) {
+    assertEquals(ALLOWED_MODELS.has(model), true, model);
+  }
 });
 
 Deno.test("rejects bad bodies", async () => {
@@ -135,6 +146,35 @@ Deno.test("429 when the per-user quota is exhausted; upstream not called", async
 Deno.test("503 (fail closed) when the quota RPC errors", async () => {
   const { handler, calls } = setup({ quota: new Response("{}", { status: 404 }) });
   assertEquals((await handler(req(valid))).status, 503);
+  assertEquals(calls.length, 1);
+});
+
+Deno.test("401 when Authorization is missing; quota and Gemini never called", async () => {
+  const { handler, calls } = setup();
+  const res = await handler(req(valid, {
+    headers: { apikey: "sb_publishable_x", "Content-Type": "application/json" },
+  }));
+  assertEquals(res.status, 401);
+  assertEquals((await res.json()).error.status, "UNAUTHENTICATED");
+  assertEquals(calls.length, 0);
+});
+
+Deno.test("401 when the quota RPC rejects the caller JWT", async () => {
+  const { handler, calls } = setup({
+    quota: new Response(JSON.stringify({ code: "PGRST301", message: "JWT expired" }), { status: 401 }),
+  });
+  const res = await handler(req(valid));
+  assertEquals(res.status, 401);
+  assertEquals((await res.json()).error.status, "UNAUTHENTICATED");
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].url.includes("/rest/v1/rpc/consume_gemini_quota"), true);
+});
+
+Deno.test("503 when the quota RPC returns 500", async () => {
+  const { handler, calls } = setup({ quota: new Response("boom", { status: 500 }) });
+  const res = await handler(req(valid));
+  assertEquals(res.status, 503);
+  assertEquals((await res.json()).error.status, "UNAVAILABLE");
   assertEquals(calls.length, 1);
 });
 

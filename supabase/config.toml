@@ -193,7 +193,8 @@ email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
-anonymous_users = 30
+# Hackathon venue Wi-Fi puts everyone behind one IP, and this limit is per hour per IP.
+anonymous_users = 300
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
 token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
@@ -405,8 +406,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
-# Gemini proxy. Keep the platform JWT check on: the iOS app always sends the
-# (anonymous) user's access token in Authorization and the publishable key in apikey.
+# Gemini proxy. Gateway verify_jwt stays on (rejects malformed JWTs). The
+# function itself returns 401 unless the quota RPC accepts the caller's user JWT.
 [functions.gemini]
 enabled = true
 verify_jwt = true

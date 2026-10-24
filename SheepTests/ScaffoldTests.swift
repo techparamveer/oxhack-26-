@@ -63,6 +63,28 @@ final class GeminiClientTests: XCTestCase {
         let brief = try GeminiClient.decodeResponse(Brief.self, from: Data(body.utf8))
         XCTAssertEqual(brief.headline, "hi")
     }
+
+    func testRequestBodyIncludesLowThinkingByDefault() {
+        let client = GeminiClient(apiKey: "", model: nil)
+        let prompt = GeminiPrompt(name: "t", system: "s", user: "u", schema: ["type": "object"], temperature: 0.5)
+        guard case .object(let root) = client.requestBody(prompt),
+              case .object(let gen) = root["generationConfig"],
+              case .object(let thinking) = gen["thinkingConfig"],
+              case .string(let level) = thinking["thinkingLevel"] else {
+            return XCTFail("generationConfig.thinkingConfig.thinkingLevel missing")
+        }
+        XCTAssertEqual(level, "low")
+    }
+
+    func testRequestBodyOmitsThinkingWhenNil() {
+        var prompt = GeminiPrompt(name: "t", system: "s", user: "u", schema: ["type": "object"], temperature: 0.5)
+        prompt.thinkingLevel = nil
+        guard case .object(let root) = GeminiClient(apiKey: "", model: nil).requestBody(prompt),
+              case .object(let gen) = root["generationConfig"] else {
+            return XCTFail("generationConfig missing")
+        }
+        XCTAssertNil(gen["thinkingConfig"])
+    }
 }
 
 final class AppStateTests: XCTestCase {
