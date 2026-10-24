@@ -36,6 +36,7 @@ struct RootView: View {
                     case .rest: RestView()
                     case .play: PlayView()
                     case .notebook: NotebookView()
+                    case .notebookFile(let path): NotebookFileView(path: path)
                     case .setup: SetupView()
                     }
                 }

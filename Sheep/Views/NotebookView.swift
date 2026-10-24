@@ -5,8 +5,15 @@ import SwiftUI
 ///
 /// Works as a tab root (no back button, bottom padding for the floating tab bar) and when pushed
 /// (e.g. Settings → "What Sheep remembers"). Needs a NavigationStack ancestor to open files.
+///
+/// Opening a file: by default pushes `Route.notebookFile(path)` through the `Router`, so the root
+/// `NavigationStack(path: router.path)` owns it (and `router.path` is non-empty on file screens).
+/// Hosts with their OWN NavigationStack (the Settings sheet) apply `.notebookOpensFilesInPlace()`
+/// so files push inside that stack instead.
 struct NotebookView: View {
     @Environment(\.isPresented) private var isPushed
+    @Environment(\.notebookNavigation) private var navigation
+    @Environment(Router.self) private var router: Router?
     @State private var groups: [NotebookGroup] = []
     @State private var eventCount = 0
     @State private var snapshotCount = 0
@@ -64,7 +71,7 @@ struct NotebookView: View {
     }
 
     private func row(_ entry: NotebookEntry) -> some View {
-        Button { selected = entry } label: {
+        Button { open(entry) } label: {
             HStack(spacing: Theme.space(1)) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(entry.title)
@@ -115,9 +122,41 @@ struct NotebookView: View {
         .padding(.horizontal, Theme.margin - Theme.cardMargin)
     }
 
+    private func open(_ entry: NotebookEntry) {
+        if navigation == .router, let router {
+            router.push(.notebookFile(entry.path))
+        } else {
+            selected = entry
+        }
+    }
+
     private func reload() {
         groups = NotebookModel.groups(from: MemoryStore.shared.list())
         eventCount = EventLog.shared.readAll().count
         snapshotCount = MemoryStore.shared.historySnapshotCount()
+    }
+}
+
+/// How `NotebookView` opens a file. `.router` (default): `Router.push(.notebookFile(path))` on the
+/// root stack. `.inPlace`: a local `navigationDestination` inside whatever NavigationStack hosts it.
+enum NotebookNavigation: Sendable {
+    case router, inPlace
+}
+
+private struct NotebookNavigationKey: EnvironmentKey {
+    static let defaultValue: NotebookNavigation = .router
+}
+
+extension EnvironmentValues {
+    var notebookNavigation: NotebookNavigation {
+        get { self[NotebookNavigationKey.self] }
+        set { self[NotebookNavigationKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Use when NotebookView lives in a NavigationStack other than the root one (e.g. the Settings sheet).
+    func notebookOpensFilesInPlace() -> some View {
+        environment(\.notebookNavigation, .inPlace)
     }
 }
