@@ -61,27 +61,10 @@ enum MemorySeeder {
             store.write("timeline/daily/\(y).md", content: DailyRenderer.render(
                 day: y, events: events, updated: y, calendar: calendar))
 
-            store.write(OfflineConsolidator.patternsPath, content: MemoryHeader(
-                id: "patterns", type: "patterns", aliases: ["patterns", "distraction", "instagram", "reels", "late", "focus", "netflix"], updated: y
-            ).file(body: """
-            # Patterns
-
-            - Slips into Instagram Reels ~12 min into Focus (seen 3×, last \(y))
-            - Instagram Reels after 22:00 (seen 2×, last \(y))
-            - Netflix runs past its Rest limit (seen 2×, last \(y))
-            """))
-
-            store.write(OfflineConsolidator.whatWorksPath, content: MemoryHeader(
-                id: "what-works", type: "procedural", aliases: ["nudges", "tone", "what works", "playful", "firm"], updated: y
-            ).file(body: """
-            # What works
-
-            Best so far: playful nudges (back 2 of 2). Least: firm (back 1 of 3).
-
-            - Playful nudges (close app): got you back 2 of 2 (last \(y))
-            - Firm nudges (back to focus): got you back 1 of 3 (last \(y))
-            - Naming the deadline ("due Friday") gets a Focus session started.
-            """))
+            // Knowledge files are derived from the seeded events (same code as the consolidator), so every
+            // "seen N×" / "back N of M" count matches the event log exactly.
+            store.write(OfflineConsolidator.patternsPath, content: seededPatterns(events, calendar: calendar).render(updated: y))
+            store.write(OfflineConsolidator.whatWorksPath, content: seededWhatWorks(events, calendar: calendar).render(updated: y))
 
             store.write(workstreamPath, content: MemoryHeader(
                 id: ws, type: "workstream", aliases: ["dissertation", "ch3", "chapter 3", "thesis", "writing", "uni"], updated: y
@@ -104,6 +87,19 @@ enum MemorySeeder {
         consolidator.latestLearned = []
         NotificationCenter.default.post(name: .memoryDidChange, object: nil)
         return events
+    }
+
+    static func seededPatterns(_ events: [SheepEvent], calendar: Calendar) -> Patterns {
+        var patterns = Patterns()
+        Patterns.observations(in: events, all: events, calendar: calendar).forEach { patterns.add($0) }
+        return patterns
+    }
+
+    static func seededWhatWorks(_ events: [SheepEvent], calendar: Calendar) -> WhatWorks {
+        var works = WhatWorks()
+        events.filter { $0.type == .nudge }.forEach { works.add($0, calendar: calendar) }
+        works.notes = [#"- Naming the deadline ("due Friday") gets a Focus session started."#]
+        return works
     }
 }
 

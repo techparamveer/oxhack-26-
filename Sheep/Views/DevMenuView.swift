@@ -10,7 +10,9 @@ struct DevMenuView: View {
     var body: some View {
         @Bindable var state = state
         NavigationStack {
-            Screen(title: "dev") {
+            Screen(title: "dev", showsBack: false) {
+                TextButton(title: "done", color: Theme.text) { dismiss() }
+            } content: {
                 VStack(alignment: .leading, spacing: Theme.space(2)) {
                     Toggle(isOn: $state.fastTimers) {
                         Text("fast timers").font(Theme.body).foregroundStyle(Theme.text)
@@ -27,21 +29,18 @@ struct DevMenuView: View {
                             status = learned.isEmpty ? "consolidated" : learned.joined(separator: "\n")
                         }
                     }
-                    TextButton(title: "reset all", color: .red) {
+                    TextButton(title: "reset all", color: Theme.scoreDown) {
                         DevActions.resetAll(state: state)
                         router.popToRoot()
                         status = "reset"
                     }
                     if !status.isEmpty { Caption(status) }
                     Spacer()
-                    Caption(GeminiClient.shared.hasKey ? "gemini: \(GeminiClient.shared.model)" : "gemini: no key — fallbacks")
+                    Caption(GeminiClient.shared.isConfigured
+                            ? "gemini: \(GeminiClient.shared.model) via \(GeminiClient.shared.proxy != nil ? "supabase" : "key")"
+                            : "gemini: not configured — fallbacks")
                 }
                 .padding(.top, Theme.space(2))
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    TextButton(title: "done", color: Theme.text) { dismiss() }
-                }
             }
         }
     }
@@ -61,8 +60,9 @@ enum DevActions {
         await MemoryConsolidator.shared.run(reason: .dailyRollover, force: true)
     }
 
+    /// A true fresh install for the demo: state, memory, `sheep.*` settings, caches, notifications.
+    @MainActor
     static func resetAll(state: AppState) {
-        state.resetAll()
-        MemoryReset.forgetEverything()
+        AppReset.resetAll(state: state)
     }
 }

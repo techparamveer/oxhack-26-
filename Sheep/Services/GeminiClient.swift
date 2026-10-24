@@ -101,6 +101,8 @@ final class GeminiClient: @unchecked Sendable {
     }
 
     var hasKey: Bool { !apiKey.isEmpty && !apiKey.hasPrefix("$(") }
+    /// A live call can be attempted (Supabase proxy or a direct key); false → fallbacks instantly.
+    var isConfigured: Bool { hasKey || proxy != nil }
 
     func generate<T: Decodable>(_ type: T.Type, _ prompt: GeminiPrompt, fallback: @autoclosure () -> T) async -> GeminiResult<T> {
         guard hasKey || proxy != nil else { return GeminiResult(value: fallback(), source: .fallback) }

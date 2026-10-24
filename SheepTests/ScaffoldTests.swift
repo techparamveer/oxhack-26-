@@ -77,6 +77,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(b.progress.level, 1)
     }
 
+    @MainActor
     func testDeepLinks() {
         let state = AppState(defaults: UserDefaults(suiteName: "sheep-tests-\(UUID())")!)
         let router = Router()

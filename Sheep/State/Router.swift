@@ -32,9 +32,10 @@ final class Router {
     func popToRoot() { path.removeAll() }
     func open(_ app: WrappedApp) { presentedWrapper = app }
 
-    /// `sheep://open/{instagram|youtube}`, `sheep://mode/{focus|rest|play}`. Returns true if handled.
-    /// Mode links only navigate; starting the mode is done by the destination screen / AppState.
-    @discardableResult
+    /// `sheep://open/{instagram|youtube}`, `sheep://mode/{focus|rest|play|idle}`. Returns true if handled.
+    /// Mode links follow Home's rules (`HomePrimary.plan` + `apply`): a running Focus is never ended (the
+    /// link routes back to it); a running Rest/Play is ended through its controller before switching.
+    @MainActor @discardableResult
     func handle(url: URL, state: AppState) -> Bool {
         guard url.scheme == "sheep", let host = url.host else { return false }
         let arg = url.pathComponents.dropFirst().first ?? ""
@@ -47,11 +48,11 @@ final class Router {
             guard let mode = Mode(rawValue: arg) else { return false }
             presentedWrapper = nil
             popToRoot()
-            switch mode {
-            case .focus: push(state.activeSession == nil ? .focusIntake : .focusSession)
-            case .rest: state.setMode(.rest); push(.rest)
-            case .play: state.setMode(.play); push(.play)
-            case .idle: state.setMode(.idle)
+            if mode == .idle {
+                HomePrimary.stop(state: state)
+            } else {
+                let plan = HomePrimary.plan(for: mode, running: HomePrimary.running(state))
+                push(HomePrimary.apply(plan, state: state))
             }
             return true
         default:
