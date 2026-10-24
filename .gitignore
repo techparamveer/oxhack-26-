@@ -16,3 +16,7 @@ xcuserdata/
 
 # Agent worktrees
 .claude/worktrees/
+
+# Python caches
+__pycache__/
+*.pyc
