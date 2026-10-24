@@ -14,12 +14,12 @@ struct AppsView: View {
                     .tracking(Theme.Tracking.wordmark)
                     .foregroundStyle(Theme.text)
                     .frame(height: 44)
-                    .padding(.horizontal, Theme.margin)
                     .padding(.top, 4)
 
-                SettingsGroup("Open in Sheep") {
+                // Flat on fog (no white cards): caption + hairline-separated rows.
+                FlatGroup("Open in Sheep", top: Theme.space(3)) {
                     ForEach(Array(WrappedApp.allCases.enumerated()), id: \.element) { index, app in
-                        if index > 0 { RowDivider() }
+                        if index > 0 { Hairline() }
                         Button { router.open(app) } label: {
                             AppRow(icon: app.symbol, title: app.title,
                                    caption: AppsCaption.wrapped(app: app, mode: state.mode),
@@ -29,9 +29,9 @@ struct AppsView: View {
                     }
                 }
 
-                SettingsGroup("Work apps") {
+                FlatGroup("Work apps") {
                     ForEach(Array(SheepSettings.workApps.enumerated()), id: \.element) { index, name in
-                        if index > 0 { RowDivider() }
+                        if index > 0 { Hairline() }
                         AppRow(icon: AppsCaption.workIcon(name), title: name,
                                caption: AppsCaption.work(muted: settings.isMuted(name), mode: state.mode),
                                dimmed: settings.isMuted(name) && (state.mode == .rest || state.mode == .play))
@@ -41,9 +41,9 @@ struct AppsView: View {
                 Text("Work apps are muted by your iOS Focus Shortcut while Rest or Play is on.")
                     .font(Theme.meta)
                     .foregroundStyle(Theme.secondary)
-                    .padding(.horizontal, Theme.margin)
-                    .padding(.top, Theme.space(1))
+                    .padding(.top, Theme.space(2))
             }
+            .padding(.horizontal, Theme.margin)
             .padding(.bottom, Theme.space(2))
         }
         .scrollIndicators(.hidden)
@@ -75,11 +75,7 @@ private struct AppRow: View {
                     .foregroundStyle(Theme.secondary)
             }
             Spacer(minLength: 8)
-            if showsChevron {
-                Text("›")
-                    .font(Theme.nunito(17, weight: 600))
-                    .foregroundStyle(Theme.secondary)
-            }
+            if showsChevron { RowChevron() }
         }
         .padding(.vertical, 14)
         .contentShape(Rectangle())

@@ -86,7 +86,7 @@ enum NudgePrompt {
         MODE: \(input.mode.rawValue)
         APP: \(input.app.rawValue)  SECTION: \(input.section.rawValue)
         SCROLLED: \(minutesString(input.activeMinutes)) min continuous, \(input.nudgesThisSession) nudges already this session
-        SESSION GOAL: \(goalLine(input)) — checklist \(input.done)/\(input.total) done, \(input.minutesLeft.map(String.init) ?? "0") min left in Pomodoro
+        SESSION GOAL: \(goalLine(input)) — checklist \(checklistLine(input)) done, \(input.minutesLeft.map(String.init) ?? "n/a") min left in Pomodoro
         NOW: \(PromptClock.time(input.now))\(input.voice == .gentle ? "\nVOICE: gentle" : "")
         MEMORY:
         \(memory)
@@ -166,6 +166,11 @@ enum NudgePrompt {
         case .shorts: "Shorts"
         case .dms: "DMs"
         }
+    }
+
+    /// "1/3"; "n/a" outside a Focus session (Rest/Play/idle have no checklist).
+    private static func checklistLine(_ input: NudgeInput) -> String {
+        input.total > 0 || input.sessionTitle != nil ? "\(input.done)/\(input.total)" : "n/a"
     }
 
     private static func goalLine(_ input: NudgeInput) -> String {

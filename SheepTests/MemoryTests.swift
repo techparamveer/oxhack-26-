@@ -195,10 +195,11 @@ final class MemoryTests: XCTestCase {
         let result = OfflineConsolidator.consolidate(newEvents: newEvents, allEvents: log.readAll() + newEvents,
                                                      files: store.list(), now: now, calendar: cal)
         let works = result.files.first { $0.path == "knowledge/what-works.md" }?.content ?? ""
-        XCTAssertTrue(works.contains("Firm nudges (back to focus): got you back 2 of 4"), works)
-        XCTAssertTrue(works.contains("Playful nudges (close app): got you back 2 of 2"), works)
+        // Seeded: firm 0 of 1, playful 1 of 1 (derived from the seeded events) + this returned firm nudge.
+        XCTAssertTrue(works.contains("Firm nudges (back to focus): got you back 1 of 2"), works)
+        XCTAssertTrue(works.contains("Playful nudges (close app): got you back 1 of 1"), works)
         XCTAssertTrue(works.contains("Naming the deadline"), "free-form notes are preserved")
-        XCTAssertTrue(result.learned.contains("Firm nudges got you back 2 of 4 times."), result.learned.joined(separator: " | "))
+        XCTAssertTrue(result.learned.contains("Firm nudges got you back 1 of 2 times."), result.learned.joined(separator: " | "))
     }
 
     func testConsolidatorRunOfflineAppliesAndSnapshots() async {

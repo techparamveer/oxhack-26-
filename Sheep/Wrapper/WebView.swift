@@ -138,6 +138,8 @@ final class WrapperController: NSObject {
 
     fileprivate func receive(_ message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let parsed = WrapperMessage.parse(message.body) else { return }
+        // Sign-in pages (facebook.com, accounts.google.com) run inject.js too; their paths aren't the app's.
+        guard Policy.isAppHost(message.frameInfo.request.url?.host ?? webView.url?.host, app: app) else { return }
         handle(parsed)
     }
 
@@ -184,38 +186,35 @@ extension WrapperController: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = action.request.url else { return decisionHandler(.allow) }
-        let scheme = url.scheme?.lowercased() ?? ""
-        if ["about", "blob", "data", "javascript"].contains(scheme) { return decisionHandler(.allow) }
-        // Never bounce out to the real Instagram/YouTube apps via custom schemes.
-        guard scheme == "http" || scheme == "https" else { return decisionHandler(.cancel) }
-        // Sub-frames (embeds, login iframes) are left alone.
-        if let frame = action.targetFrame, !frame.isMainFrame { return decisionHandler(.allow) }
-
-        guard Policy.isAppHost(url.host, app: app) else {
+        // A nil target frame is a new window (handled in `createWebViewWith`); treat it as main frame.
+        let isMainFrame = action.targetFrame?.isMainFrame ?? true
+        switch WrapperNavigation.decide(url: url, app: app, mode: mode, isMainFrame: isMainFrame,
+                                        userInitiated: WrapperNavigation.isUserInitiated(action.navigationType)) {
+        case .allow:
+            decisionHandler(.allow)
+        case .cancel:
+            decisionHandler(.cancel)
+        case .block(let section):
+            decisionHandler(.cancel)
+            block(section)
+            if webView.url == nil { webView.load(URLRequest(url: app.homeURL)) }
+        case .openExternally:
             decisionHandler(.cancel)
             openExternally(url)
-            return
         }
-        guard Policy.isAllowed(app: app, path: url.path, mode: mode) else {
-            decisionHandler(.cancel)
-            block(Policy.section(app: app, path: url.path))
-            if webView.url == nil { webView.load(URLRequest(url: app.homeURL)) }
-            return
-        }
-        decisionHandler(.allow)
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) { applyCSS() }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { applyCSS() }
 
-    /// `target=_blank` / `window.open`: app hosts load in place, everything else opens in Safari.
+    /// `target=_blank` / `window.open`: app + sign-in hosts load in place, everything else opens in Safari.
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         if let url = action.request.url {
-            if Policy.isAppHost(url.host, app: app) {
-                webView.load(action.request)
-            } else if url.scheme == "http" || url.scheme == "https" {
-                openExternally(url)
+            switch WrapperNavigation.decideNewWindow(url: url, app: app) {
+            case .allow: webView.load(action.request)
+            case .openExternally: openExternally(url)
+            default: break
             }
         }
         return nil

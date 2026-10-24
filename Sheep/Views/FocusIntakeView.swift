@@ -26,7 +26,7 @@ struct FocusIntakeView: View {
     private let stepCount = 4
 
     var body: some View {
-        Screen(title: "focus") {
+        Screen(title: "focus", backDisabled: isPlanning) {
             VStack(alignment: .leading, spacing: 0) {
                 SectionLabel("\(step + 1) of \(stepCount)")
                     .padding(.top, Theme.space(3))
@@ -42,8 +42,7 @@ struct FocusIntakeView: View {
         }
         .onAppear(perform: prefill)
         .animation(Theme.spring, value: step)
-        // No leaving mid-plan: the planner task would otherwise start a session behind the user's back.
-        .navigationBarBackButtonHidden(isPlanning)
+        // No leaving mid-plan (`backDisabled`): the planner task would otherwise start a session behind the user's back.
     }
 
     // MARK: Steps
@@ -110,6 +109,7 @@ struct FocusIntakeView: View {
                 }
             }
             .padding(.top, Theme.space(2))
+            .sensoryFeedback(.selection, trigger: pomodoros)
             Caption(durationNote)
                 .frame(maxWidth: .infinity)
         }

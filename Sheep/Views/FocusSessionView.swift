@@ -120,8 +120,13 @@ struct FocusSessionView: View {
                     }
                     .padding(.vertical, Theme.space(1.5))
                     .contentShape(Rectangle())
+                    // "+10 xp" floats up from the ticked row ("−10 xp" when unticked).
+                    .overlay(alignment: .trailing) {
+                        XPChangeLabel(xp: item.done ? XPRules.perChecklistItem : 0)
+                    }
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("focus.checklist.item")
                 .accessibilityAddTraits(item.done ? .isSelected : [])
                 Hairline()
             }

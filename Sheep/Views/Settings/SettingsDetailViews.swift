@@ -54,7 +54,8 @@ private struct SettingsDetail<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        ScrollView {
+        Screen(title: title) {
+          ScrollView {
             VStack(alignment: .leading, spacing: Theme.space(1)) {
                 Surface(padding: EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)) {
                     VStack(spacing: 0) { content() }
@@ -66,18 +67,12 @@ private struct SettingsDetail<Content: View>: View {
                         .padding(.horizontal, 8)
                 }
             }
-            .padding(.horizontal, Theme.cardMargin)
             .padding(.top, Theme.space(2))
+          }
+          .scrollIndicators(.hidden)
+          // Cards use the 16 pt card margin inside Screen's 24 pt.
+          .padding(.horizontal, Theme.cardMargin - Theme.margin)
         }
-        .background(Theme.background.ignoresSafeArea())
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(title).font(Theme.headline).foregroundStyle(Theme.text)
-            }
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Theme.background, for: .navigationBar)
     }
 }
 

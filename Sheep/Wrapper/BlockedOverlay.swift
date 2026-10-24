@@ -18,7 +18,8 @@ struct BlockedOverlay: View {
 
             VStack(spacing: 0) {
                 Spacer()
-                SheepView(woolStage: state.progress.woolStage, size: 140)
+                // Only Focus blocks, so this is the reading sheep.
+                SheepView(woolStage: state.progress.woolStage, size: 140, mode: .focus, xp: state.progress.xp)
                 Text("Not now")
                     .font(Theme.title)
                     .foregroundStyle(Theme.text)

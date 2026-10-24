@@ -86,7 +86,7 @@ final class DailyBriefService {
                                     calendar: Calendar = .current) async -> DailyBriefValue {
         let offline = OfflineBrief.make(events: log.readAll(), store: store, now: now, calendar: calendar)
         let day = MemoryDates.day(now, calendar: calendar)
-        guard client.hasKey else { return offline }
+        guard client.isConfigured else { return offline }
         let memory = MemoryContext.build(for: .dailyBrief, store: store, now: now, calendar: calendar)
         let prompt = DailyBriefPrompt.prompt(now: now, memory: memory)
         let fallback = DailyBriefPrompt.Response(headline: offline.headline, body: offline.body,

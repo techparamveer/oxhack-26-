@@ -71,14 +71,15 @@ final class MemoryConsolidator: @unchecked Sendable {
         let files = store.list()
         let offline = OfflineConsolidator.consolidate(newEvents: fresh, allEvents: all, files: files,
                                                       now: now, calendar: calendar)
-        let response: ConsolidatorResponse
-        if fresh.isEmpty || !client.hasKey {
-            response = offline
-        } else {
+        var response = offline
+        if !fresh.isEmpty && client.isConfigured {
             let prompt = ConsolidatorPrompt.prompt(
                 today: MemoryDates.day(now, calendar: calendar), reason: reason, files: files,
                 lastRunAt: since, events: fresh.map { $0.jsonLine() }.joined(separator: "\n"))
-            response = await client.generate(ConsolidatorResponse.self, prompt, fallback: offline).value
+            let live = await client.generate(ConsolidatorResponse.self, prompt, fallback: offline).value
+            // An empty / unusable live reply must not swallow the new events: use the offline rewrite.
+            // (`lastRunAt` then advances because the offline consolidator really did fold them in.)
+            response = isUsable(live) ? live : offline
         }
 
         apply(response, today: MemoryDates.day(now, calendar: calendar))
@@ -88,6 +89,15 @@ final class MemoryConsolidator: @unchecked Sendable {
         if !learned.isEmpty { latestLearned = learned }
         NotificationCenter.default.post(name: .memoryDidChange, object: nil)
         return learned
+    }
+
+    /// True when a reply has at least one file `apply` would accept (safe `.md` path; a write with content).
+    func isUsable(_ response: ConsolidatorResponse) -> Bool {
+        response.files.contains { file in
+            let path = file.path.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard path.hasSuffix(".md"), store.safeURL(path) != nil else { return false }
+            return file.op == .moveToCompleted || !file.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
     /// Applies returned files in one history batch. Returns the paths written.

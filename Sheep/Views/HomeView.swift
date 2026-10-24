@@ -11,6 +11,8 @@ struct HomeView: View {
     @State private var picked: Mode?
     @State private var score = DayScore()
     @State private var delta: Int?
+    @State private var restBrief: HomeMessage?
+    @State private var yesterdayTotal: Int?
     @State private var hapticTick = 0
     private var brief = DailyBriefService.shared
 
@@ -22,11 +24,7 @@ struct HomeView: View {
     /// Label + hero art: the running mode; when idle, the pill the user picked (else "No mode on" / awake sheep).
     private var displayMode: Mode { state.mode != .idle ? state.mode : (picked ?? .idle) }
 
-    private var running: HomePrimary.Running {
-        HomePrimary.Running(focus: state.activeSession != nil,
-                            rest: state.restSession != nil && state.restSession?.endedAt == nil,
-                            play: state.playSession != nil && state.playSession?.endedAt == nil)
-    }
+    private var running: HomePrimary.Running { HomePrimary.running(state) }
 
     private var plan: HomePrimary.Plan { HomePrimary.plan(for: selection, running: running) }
 
@@ -35,6 +33,11 @@ struct HomeView: View {
         // Otherwise the card explains the button (how to start, or how to get back to the running mode).
         if running == HomePrimary.Running(), plan.mode == .focus,
            let message = HomeMessage.brief(headline: brief.headline, body: brief.body, isFromMemory: brief.isFromMemory) {
+            return message
+        }
+        // Rest after a day's focus: "You did 3 Pomodoros. Switch off." from today's real numbers.
+        if plan.mode == .rest, var message = restBrief {
+            if plan.end == .play { message.body += " Starting ends your play." }
             return message
         }
         // Follow the button (a running Focus keeps it on "Back to focus"), so card and button agree.
@@ -49,7 +52,7 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     header
                     hero
-                    ScoreHeader(mode: displayMode, score: score.total, delta: delta)
+                    ScoreHeader(mode: displayMode, score: score.total, delta: delta, yesterday: yesterdayTotal)
                         .padding(.top, 6)
                     ModePills(selection: pillSelection, scores: score, onSelect: select)
                         .padding(.top, 16)
@@ -106,29 +109,23 @@ struct HomeView: View {
         withAnimation(Theme.spring) { picked = mode }
     }
 
-    private func start() {
-        hapticTick += 1
-        let plan = plan
+    private func start() {   // PrimaryButton plays the haptic
         // Switching between Rest and Play (or to Focus) ends the running one cleanly first.
-        switch plan.end {
-        case .rest: RestController.endRest(state: state)
-        case .play: RestController.endPlay(state: state)
-        default: break
-        }
-        switch plan.route {
-        case .rest: state.setMode(.rest)
-        case .play: state.setMode(.play)
-        default: break
-        }
-        router.push(plan.route)
+        router.push(HomePrimary.apply(plan, state: state))
     }
 
     private func recompute() {
-        let result = DayScore.today(events: EventLog.shared.readAll())
+        let events = EventLog.shared.readAll()
+        let result = DayScore.today(events: events)
         withAnimation(Theme.spring) {
             score = result.score
             delta = result.delta
+            yesterdayTotal = Calendar.current.date(byAdding: .day, value: -1, to: .now)
+                .flatMap { DayScore.compute(events: events, day: $0).total }
+            restBrief = RestBrief.message(events: events, mutedApps: MutedAppsList.apps(),
+                                          rest: state.restSession, fast: state.fastTimers)
         }
+        DailyScoreSync.shared.submit(result.score)   // debounced, fire-and-forget
     }
 }
 
