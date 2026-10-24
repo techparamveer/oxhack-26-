@@ -77,31 +77,35 @@ struct GeminiResult<T> {
 
 /// REST client for `generateContent`. Every call returns a value: live JSON if it arrives in time
 /// and decodes, otherwise the caller's hardcoded fallback. The UI never hangs or errors.
+/// Order: Supabase `gemini` Edge Function (if configured) → direct key (if present) → fallback,
+/// all inside the prompt's single `timeout` budget.
 final class GeminiClient: @unchecked Sendable {
-    static let shared = GeminiClient()
+    static let shared = GeminiClient(proxy: SupabaseClient.shared)
 
     /// Rolling Flash alias; override with GEMINI_MODEL in Secrets.xcconfig.
     static let defaultModel = "gemini-flash-latest"
 
     let apiKey: String
     let model: String
+    let proxy: GeminiProxying?
     private let session: URLSession
 
-    init(apiKey: String? = nil, model: String? = nil, session: URLSession = .shared) {
+    init(apiKey: String? = nil, model: String? = nil, session: URLSession = .shared, proxy: GeminiProxying? = nil) {
         let info = Bundle.main.infoDictionary ?? [:]
         let key = apiKey ?? (info["GEMINI_API_KEY"] as? String) ?? ""
         let m = model ?? (info["GEMINI_MODEL"] as? String) ?? ""
         self.apiKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
         self.model = m.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Self.defaultModel : m
         self.session = session
+        self.proxy = proxy
     }
 
     var hasKey: Bool { !apiKey.isEmpty && !apiKey.hasPrefix("$(") }
 
     func generate<T: Decodable>(_ type: T.Type, _ prompt: GeminiPrompt, fallback: @autoclosure () -> T) async -> GeminiResult<T> {
-        guard hasKey else { return GeminiResult(value: fallback(), source: .fallback) }
+        guard hasKey || proxy != nil else { return GeminiResult(value: fallback(), source: .fallback) }
         do {
-            let value: T = try await withTimeout(prompt.timeout) { try await self.call(T.self, prompt) }
+            let value: T = try await withTimeout(prompt.timeout) { try await self.callChain(T.self, prompt) }
             return GeminiResult(value: value, source: .live)
         } catch {
             #if DEBUG
@@ -126,9 +130,30 @@ final class GeminiClient: @unchecked Sendable {
         ]
     }
 
-    private func call<T: Decodable>(_ type: T.Type, _ prompt: GeminiPrompt) async throws -> T {
+    /// Proxy first (60% of the budget when a direct key can still be tried), then the direct key.
+    private func callChain<T: Decodable>(_ type: T.Type, _ prompt: GeminiPrompt) async throws -> T {
+        let start = Date()
+        if let proxy {
+            let budget = hasKey ? prompt.timeout * 0.6 : prompt.timeout
+            do {
+                return try await withTimeout(budget) {
+                    let data = try await proxy.generateContent(model: self.model, body: self.requestBody(prompt), timeout: budget)
+                    return try Self.decodeResponse(T.self, from: data)
+                }
+            } catch {
+                #if DEBUG
+                print("[Gemini] \(prompt.name) proxy failed: \(error)")
+                #endif
+                if !hasKey { throw error }
+            }
+        }
+        let remaining = max(0.5, prompt.timeout - Date().timeIntervalSince(start))
+        return try await call(T.self, prompt, timeout: remaining)
+    }
+
+    private func call<T: Decodable>(_ type: T.Type, _ prompt: GeminiPrompt, timeout: TimeInterval) async throws -> T {
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
-        var req = URLRequest(url: url, timeoutInterval: prompt.timeout)
+        var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
@@ -151,17 +176,9 @@ final class GeminiClient: @unchecked Sendable {
         return try JSONDecoder().decode(T.self, from: Data(text.utf8))
     }
 
+    /// Hard deadline (see `withDeadline`): returns on time even if `op` ignores cancellation.
     private func withTimeout<R>(_ seconds: TimeInterval, _ op: @escaping @Sendable () async throws -> R) async throws -> R {
-        try await withThrowingTaskGroup(of: R.self) { group in
-            group.addTask { try await op() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-                throw GeminiError.timeout
-            }
-            defer { group.cancelAll() }
-            guard let first = try await group.next() else { throw GeminiError.timeout }
-            return first
-        }
+        try await withDeadline(seconds, onTimeout: GeminiError.timeout, op)
     }
 }
 

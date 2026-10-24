@@ -94,6 +94,7 @@ final class MemoryStore: @unchecked Sendable {
         AppPaths.ensure(url.deletingLastPathComponent())
         do {
             try content.write(to: url, atomically: true, encoding: .utf8)
+            SupabaseSync.shared.memoryWritten(path: path, content: content)   // background backup
             return true
         } catch {
             return false
@@ -107,7 +108,9 @@ final class MemoryStore: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard fm.fileExists(atPath: url.path) else { return false }
         snapshot(path)
-        return (try? fm.removeItem(at: url)) != nil
+        guard (try? fm.removeItem(at: url)) != nil else { return false }
+        SupabaseSync.shared.memoryDeleted(path: path)
+        return true
     }
 
     /// Moves `from` → `to` (snapshotting both sides first), optionally replacing the content.
