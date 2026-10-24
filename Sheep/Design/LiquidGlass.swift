@@ -2,7 +2,9 @@ import SwiftUI
 
 /// iOS 26+ Liquid Glass with Paper fallbacks on iOS 17–25 (outlined / wool surfaces).
 enum LiquidGlass {
-    /// Groups adjacent glass so sampling and morphing stay consistent (tab bar, mode pills).
+    /// Groups adjacent glass so sampling and morphing stay consistent (mode pills).
+    /// Do not wrap controls that VoiceOver / XCTest must hit — `GlassEffectContainer`
+    /// merges descendant accessibility frames on iOS 26.
     @ViewBuilder
     static func container<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -63,6 +65,8 @@ extension View {
     }
 
     /// Active tab item highlight inside the bar.
+    /// Inactive must return `self` — a bare `if active` drops the label (`EmptyView`),
+    /// which collapsed Apps/Notebook to a 0×0 AX frame and hid them.
     @ViewBuilder
     func sheepGlassTabItemChrome(active: Bool) -> some View {
         if active {
@@ -72,6 +76,8 @@ extension View {
             } else {
                 background(shape.fill(Theme.background))
             }
+        } else {
+            self
         }
     }
 }

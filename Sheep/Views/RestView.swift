@@ -24,6 +24,7 @@ struct RestView: View {
             }
         }
         .animation(Theme.spring, value: state.restSession == nil)
+        .onAppear { RestController.restoreOveruseNotifications(state: state) }
         .onDisappear {
             // Backed out without starting: don't leave the app sitting in Rest.
             if state.restSession == nil, !router.path.contains(.rest), state.mode == .rest {

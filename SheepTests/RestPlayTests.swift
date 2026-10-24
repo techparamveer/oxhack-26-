@@ -270,6 +270,54 @@ final class RestPlayTests: XCTestCase {
         RestController.endPlay(state: state, log: EventLog(fileURL: { self.tmp.appendingPathComponent("e.jsonl") }))
         XCTAssertEqual(spy.cleared, [RestController.playNotificationID])
     }
+
+    func testEndWithoutSessionDoesNotClearARunningRestNotification() {
+        let live = AppState(defaults: defaults)
+        RestController.startRest(activity: "Netflix", limitMinutes: 45, state: live, client: offline)
+        XCTAssertEqual(spy.scheduled.count, 1)
+
+        let other = AppState(defaults: UserDefaults(suiteName: "rest-other-\(UUID())")!)
+        other.setMode(.focus)
+        XCTAssertEqual(RestController.endRest(state: other), 0)
+        XCTAssertTrue(spy.cleared.isEmpty, "ending a missing Rest must not cancel a running Rest's banner")
+        XCTAssertEqual(live.mode, .rest)
+        XCTAssertNotNil(live.restSession)
+    }
+
+    func testRelaunchKeepsRunningRestAndRestoresOveruseNotification() async {
+        let state = AppState(defaults: defaults)
+        await RestController.startRest(activity: "Netflix", limitMinutes: 45, state: state, client: offline).value
+        XCTAssertEqual(spy.scheduled.count, 1)
+        spy.scheduled.removeAll()
+        spy.cleared.removeAll()
+
+        let reloaded = AppState(defaults: defaults)
+        XCTAssertEqual(reloaded.mode, .rest)
+        XCTAssertEqual(reloaded.restSession?.activity, "Netflix")
+        XCTAssertTrue(spy.cleared.isEmpty, "mode reconciliation must not cancel the overuse notification")
+
+        RestController.restoreOveruseNotifications(state: reloaded)
+        XCTAssertEqual(spy.scheduled.last?.id, RestController.restNotificationID)
+        XCTAssertTrue(spy.scheduled.last?.body.contains("netflix") ?? false, spy.scheduled.last?.body ?? "")
+        XCTAssertEqual(spy.scheduled.last?.after ?? 0, 20, accuracy: 1)
+    }
+
+    func testRestoreDoesNotScheduleWithoutARunningSession() {
+        let state = AppState(defaults: defaults)
+        state.setMode(.rest)
+        RestController.restoreOveruseNotifications(state: state)
+        XCTAssertTrue(spy.scheduled.isEmpty)
+        XCTAssertEqual(state.mode, .rest)
+    }
+
+    func testRestoreRearmsPlayOveruseNotification() {
+        let state = AppState(defaults: defaults)
+        RestController.startPlay(limitMinutes: 60, state: state)
+        spy.scheduled.removeAll()
+        RestController.restoreOveruseNotifications(state: state)
+        XCTAssertEqual(spy.scheduled.last?.id, RestController.playNotificationID)
+        XCTAssertEqual(spy.scheduled.last?.after ?? 0, 20, accuracy: 1)
+    }
 }
 
 final class SpyNotifier: LimitNotifier {

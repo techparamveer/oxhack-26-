@@ -111,14 +111,48 @@ enum RestController {
         }
     }
 
+    /// Re-arms a running Rest/Play overuse notification after launch or a scene flip.
+    /// Mode reconciliation only touches `AppState`; it must not leave a live session without a banner.
+    @MainActor
+    static func restoreOveruseNotifications(state: AppState) {
+        if let rest = state.restSession, rest.endedAt == nil {
+            rescheduleRestFallback(for: rest, state: state)
+        }
+        if let play = state.playSession, play.endedAt == nil {
+            reschedulePlayNudge(for: play, state: state)
+        }
+    }
+
+    @MainActor
+    static func rescheduleRestFallback(for session: RestSession, state: AppState) {
+        let fast = state.fastTimers
+        let fireAt = session.startedAt.addingTimeInterval(LimitClock.overuseDelay(limitMinutes: session.limitMinutes, fast: fast))
+        let actual = LimitClock.projectedMinutesAtOveruse(limitMinutes: session.limitMinutes, fast: fast)
+        let fallback = RestNudgePrompt.fallback(activity: session.activity.lowercased(), limitMinutes: session.limitMinutes,
+                                                actualMinutes: actual, now: fireAt)
+        notifier.schedule(id: restNotificationID, title: fallback.title, body: fallback.body,
+                          after: max(1, fireAt.timeIntervalSinceNow))
+    }
+
+    @MainActor
+    static func reschedulePlayNudge(for session: PlaySession, state: AppState) {
+        let fast = state.fastTimers
+        let fireAt = session.startedAt.addingTimeInterval(LimitClock.overuseDelay(limitMinutes: session.limitMinutes, fast: fast))
+        let actual = LimitClock.projectedMinutesAtOveruse(limitMinutes: session.limitMinutes, fast: fast)
+        let text = playFallback(limitMinutes: session.limitMinutes, actualMinutes: actual)
+        notifier.schedule(id: playNotificationID, title: text.title, body: text.body,
+                          after: max(1, fireAt.timeIntervalSinceNow))
+    }
+
     /// Logs `rest_activity`, awards XP, clears the session and returns to Idle. Returns XP earned.
+    /// A call with no session must not cancel another state's running Rest banner.
     @MainActor @discardableResult
     static func endRest(state: AppState, now: Date = .now, log: EventLog = .shared) -> Int {
-        notifier.clear(id: restNotificationID)
         guard let session = state.restSession else {
             if state.mode == .rest { state.setMode(.idle) }
             return 0
         }
+        notifier.clear(id: restNotificationID)
         let minutes = LimitClock.elapsedMinutes(startedAt: session.startedAt, now: now,
                                                 limitMinutes: session.limitMinutes, fast: state.fastTimers)
         let actual = Int(minutes.rounded())
@@ -147,11 +181,11 @@ enum RestController {
 
     @MainActor @discardableResult
     static func endPlay(state: AppState, now: Date = .now, log: EventLog = .shared) -> Int {
-        notifier.clear(id: playNotificationID)
         guard let session = state.playSession else {
             if state.mode == .play { state.setMode(.idle) }
             return 0
         }
+        notifier.clear(id: playNotificationID)
         let minutes = LimitClock.elapsedMinutes(startedAt: session.startedAt, now: now,
                                                 limitMinutes: session.limitMinutes, fast: state.fastTimers)
         let xp = XPRules.restOrPlay(actualMinutes: Int(minutes.rounded()), limitMinutes: session.limitMinutes)

@@ -27,6 +27,7 @@ struct PlayView: View {
             }
         }
         .animation(Theme.spring, value: state.playSession == nil)
+        .onAppear { RestController.restoreOveruseNotifications(state: state) }
         .onDisappear {
             if state.playSession == nil, !router.path.contains(.play), state.mode == .play {
                 state.setMode(.idle)
