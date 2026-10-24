@@ -19,14 +19,45 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
         center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
+    /// Latest schedule/cancel per id. `schedule` enqueues asynchronously (after the permission
+    /// check), so a later `schedule`/`cancel` for the same id must win over an earlier one still in flight.
+    private let lock = NSLock()
+    private var generations: [String: Int] = [:]
+
+    private func bump(_ id: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        generations[id, default: 0] += 1
+        return generations[id]!
+    }
+
+    private func isCurrent(_ id: String, _ generation: Int) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return generations[id] == generation
+    }
+
     /// Schedules (or replaces) a notification `after` seconds from now.
     func schedule(id: String, title: String, body: String, after seconds: TimeInterval) {
+        schedule(id: id, title: title, body: body, after: seconds, onlyIfMissing: false)
+    }
+
+    /// Like `schedule`, but keeps an already-pending request for `id` (e.g. Gemini's text) untouched.
+    func scheduleIfMissing(id: String, title: String, body: String, after seconds: TimeInterval) {
+        schedule(id: id, title: title, body: body, after: seconds, onlyIfMissing: true)
+    }
+
+    private func schedule(id: String, title: String, body: String, after seconds: TimeInterval, onlyIfMissing: Bool) {
         let fireAt = Date().addingTimeInterval(max(1, seconds))
+        let generation = bump(id)
         Task { [id, title, body] in
             let settings = await self.center.notificationSettings()
             if settings.authorizationStatus == .notDetermined {
                 await self.requestAuthorization()
             }
+            if onlyIfMissing {
+                let pending = await self.center.pendingNotificationRequests()
+                if pending.contains(where: { $0.identifier == id }) { return }
+            }
+            guard self.isCurrent(id, generation) else { return }   // cancelled or replaced meanwhile
             self.enqueue(id: id, title: title, body: body, after: max(1, fireAt.timeIntervalSinceNow))
         }
     }
@@ -47,6 +78,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
     }
 
     func cancel(id: String) {
+        _ = bump(id)
         center.removePendingNotificationRequests(withIdentifiers: [id])
     }
 

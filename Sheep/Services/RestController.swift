@@ -54,6 +54,14 @@ protocol LimitNotifier {
     func schedule(id: String, title: String, body: String, after seconds: TimeInterval)
     /// Removes the pending request and any already-delivered banner for `id`.
     func clear(id: String)
+    /// Schedules only when nothing is pending for `id` (restore must not replace Gemini's text).
+    func scheduleIfMissing(id: String, title: String, body: String, after seconds: TimeInterval)
+}
+
+extension LimitNotifier {
+    func scheduleIfMissing(id: String, title: String, body: String, after seconds: TimeInterval) {
+        schedule(id: id, title: title, body: body, after: seconds)
+    }
 }
 
 extension NotificationService: LimitNotifier {
@@ -113,35 +121,38 @@ enum RestController {
 
     /// Re-arms a running Rest/Play overuse notification after launch or a scene flip.
     /// Mode reconciliation only touches `AppState`; it must not leave a live session without a banner.
+    /// Never re-fires one whose time has passed (already delivered) and never replaces a pending one.
     @MainActor
-    static func restoreOveruseNotifications(state: AppState) {
+    static func restoreOveruseNotifications(state: AppState, now: Date = .now) {
         if let rest = state.restSession, rest.endedAt == nil {
-            rescheduleRestFallback(for: rest, state: state)
+            rescheduleRestFallback(for: rest, state: state, now: now)
         }
         if let play = state.playSession, play.endedAt == nil {
-            reschedulePlayNudge(for: play, state: state)
+            reschedulePlayNudge(for: play, state: state, now: now)
         }
     }
 
     @MainActor
-    static func rescheduleRestFallback(for session: RestSession, state: AppState) {
+    static func rescheduleRestFallback(for session: RestSession, state: AppState, now: Date = .now) {
         let fast = state.fastTimers
         let fireAt = session.startedAt.addingTimeInterval(LimitClock.overuseDelay(limitMinutes: session.limitMinutes, fast: fast))
+        guard fireAt.timeIntervalSince(now) > 1 else { return }
         let actual = LimitClock.projectedMinutesAtOveruse(limitMinutes: session.limitMinutes, fast: fast)
         let fallback = RestNudgePrompt.fallback(activity: session.activity.lowercased(), limitMinutes: session.limitMinutes,
                                                 actualMinutes: actual, now: fireAt)
-        notifier.schedule(id: restNotificationID, title: fallback.title, body: fallback.body,
-                          after: max(1, fireAt.timeIntervalSinceNow))
+        notifier.scheduleIfMissing(id: restNotificationID, title: fallback.title, body: fallback.body,
+                                   after: fireAt.timeIntervalSince(now))
     }
 
     @MainActor
-    static func reschedulePlayNudge(for session: PlaySession, state: AppState) {
+    static func reschedulePlayNudge(for session: PlaySession, state: AppState, now: Date = .now) {
         let fast = state.fastTimers
         let fireAt = session.startedAt.addingTimeInterval(LimitClock.overuseDelay(limitMinutes: session.limitMinutes, fast: fast))
+        guard fireAt.timeIntervalSince(now) > 1 else { return }
         let actual = LimitClock.projectedMinutesAtOveruse(limitMinutes: session.limitMinutes, fast: fast)
         let text = playFallback(limitMinutes: session.limitMinutes, actualMinutes: actual)
-        notifier.schedule(id: playNotificationID, title: text.title, body: text.body,
-                          after: max(1, fireAt.timeIntervalSinceNow))
+        notifier.scheduleIfMissing(id: playNotificationID, title: text.title, body: text.body,
+                                   after: fireAt.timeIntervalSince(now))
     }
 
     /// Logs `rest_activity`, awards XP, clears the session and returns to Idle. Returns XP earned.

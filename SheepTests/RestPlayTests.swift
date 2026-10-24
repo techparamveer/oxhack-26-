@@ -310,6 +310,18 @@ final class RestPlayTests: XCTestCase {
         XCTAssertEqual(state.mode, .rest)
     }
 
+    func testRestoreDoesNotRefireAnOveruseNotificationThatAlreadyFired() {
+        let state = AppState(defaults: defaults)
+        state.fastTimers = true
+        let start = Date()
+        RestController.startRest(activity: "Netflix", limitMinutes: 45, state: state, now: start, client: offline)
+        RestController.startPlay(limitMinutes: 60, state: state, now: start)
+        spy.scheduled.removeAll()
+        // Scene flips back to active after the banners were delivered: no second banner.
+        RestController.restoreOveruseNotifications(state: state, now: start.addingTimeInterval(LimitClock.fastFireSeconds + 5))
+        XCTAssertTrue(spy.scheduled.isEmpty)
+    }
+
     func testRestoreRearmsPlayOveruseNotification() {
         let state = AppState(defaults: defaults)
         RestController.startPlay(limitMinutes: 60, state: state)
