@@ -8,6 +8,7 @@ struct SheepApp: App {
 
     init() {
         NotificationService.shared.configure()
+        SupabaseSync.shared.start()   // anonymous sign-in + queue flush in the background; never blocks launch
     }
 
     var body: some Scene {

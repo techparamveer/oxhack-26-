@@ -80,6 +80,7 @@ final class EventLog: @unchecked Sendable {
         } else {
             try? line.write(to: url, options: .atomic)
         }
+        SupabaseSync.shared.record(event)   // background mirror; no-op unless Supabase is configured
     }
 
     func readAll() -> [SheepEvent] {

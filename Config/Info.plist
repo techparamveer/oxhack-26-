@@ -35,6 +35,10 @@
 	<string>$(GEMINI_API_KEY)</string>
 	<key>GEMINI_MODEL</key>
 	<string>$(GEMINI_MODEL)</string>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
+	<key>SUPABASE_HOST</key>
+	<string>$(SUPABASE_HOST)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIAppFonts</key>
