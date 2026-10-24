@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// iOS 26+ Liquid Glass with Paper fallbacks on iOS 17–25 (outlined / wool surfaces).
+/// Liquid Glass is reserved for the floating tab bar and 44 pt circle buttons (iOS 26+).
+/// Content surfaces (message card, Settings groups, mode pills) always use Paper fills/strokes.
 enum LiquidGlass {
-    /// Groups adjacent glass so sampling and morphing stay consistent (tab bar, mode pills).
+    /// Groups adjacent glass so sampling and morphing stay consistent (tab bar).
     @ViewBuilder
     static func container<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         if #available(iOS 26.0, *) {
@@ -24,30 +25,20 @@ extension View {
         }
     }
 
-    /// Home message card, Settings groups (radius 24).
-    @ViewBuilder
+    /// Home message card, Settings groups (radius 24). Always Paper white — never glass.
     func sheepGlassCard(radius: CGFloat = Theme.cardRadius) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        if #available(iOS 26.0, *) {
-            glassEffect(.regular, in: shape)
-        } else {
-            background(shape.fill(Theme.surface))
-        }
+        return background(shape.fill(Theme.surface))
     }
 
-    /// Mode pill score capsule.
-    @ViewBuilder
+    /// Mode pill score capsule. Always Paper stroke — never glass.
     func sheepGlassModePill(active: Bool, accent: Color) -> some View {
-        if #available(iOS 26.0, *) {
-            let glass: Glass = active ? .regular.interactive().tint(accent) : .regular.interactive()
-            glassEffect(glass, in: Capsule())
-        } else {
-            background(active ? Theme.surface : Color.clear)
-                .overlay(
-                    Capsule().strokeBorder(active ? accent : Theme.outline,
-                                           lineWidth: active ? Theme.activeOutlineWidth : Theme.outlineWidth)
-                )
-        }
+        // Paper: active = white capsule + 2.5 pt accent ring; inactive = 1.5 pt outline, no fill.
+        background(Capsule().fill(active ? Theme.surface : Color.clear))
+            .overlay(
+                Capsule().strokeBorder(active ? accent : Theme.outline,
+                                       lineWidth: active ? Theme.activeOutlineWidth : Theme.outlineWidth)
+            )
     }
 
     /// Floating tab bar capsule.
@@ -72,6 +63,9 @@ extension View {
             } else {
                 background(shape.fill(Theme.background))
             }
+        } else {
+            // ViewBuilder `if` without `else` returns EmptyView, which hid Apps and Notebook.
+            self
         }
     }
 }
