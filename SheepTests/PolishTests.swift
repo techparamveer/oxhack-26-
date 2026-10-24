@@ -67,6 +67,7 @@ final class PolishTests: XCTestCase {
     func testAppHostsKeepPolicyAndSchemesAreFiltered() {
         XCTAssertEqual(decide("https://www.instagram.com/reels/abc/", mode: .focus), .block(.reels))
         XCTAssertEqual(decide("https://www.instagram.com/reels/abc/", mode: .rest), .allow)
+        XCTAssertEqual(decide("https://www.instagram.com/direct/inbox/", mode: .focus), .allow)
         XCTAssertEqual(decide("https://www.instagram.com/direct/inbox/", mode: .rest), .allow)
         XCTAssertEqual(decide("https://www.instagram.com/explore/", mode: .focus), .block(.explore))
         XCTAssertEqual(decide("https://m.youtube.com/shorts/x", .youtube, mode: .focus), .block(.shorts))
