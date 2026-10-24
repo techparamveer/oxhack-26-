@@ -110,11 +110,17 @@ final class IntentTests: XCTestCase {
         XCTAssertNil(router.presentedWrapper)
     }
 
+    #if DEBUG
     func testLaunchEnvironmentQueuesURL() {
         let intents = IntentRouter(environment: ["SHEEP_OPEN_URL": "sheep://open/youtube"])
         XCTAssertEqual(intents.pending, DeepLink.open(.youtube))
         XCTAssertNil(IntentRouter(environment: [:]).pending)
     }
+    #else
+    func testLaunchEnvironmentIgnoredInRelease() {
+        XCTAssertNil(IntentRouter(environment: ["SHEEP_OPEN_URL": "sheep://open/youtube"]).pending)
+    }
+    #endif
 
     private func deliver(_ url: URL) -> (Router, AppState) {
         let state = AppState(defaults: defaults)
