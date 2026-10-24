@@ -38,7 +38,7 @@ enum Theme {
         ])
         return Font(UIFont(descriptor: descriptor, size: size) as CTFont)
     }
-    static let display  = nunito(64, weight: 300)
+    static let display  = nunito(76, weight: 800)
     static let title    = nunito(28, weight: 700)
     static let headline = nunito(20, weight: 700)
     static let body     = nunito(17, weight: 400)

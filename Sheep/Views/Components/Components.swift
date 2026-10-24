@@ -1,24 +1,38 @@
 import SwiftUI
 
-/// Full-width pill filled with the mode accent. Use for the ONE primary action on a screen.
+/// Pill filled with the mode accent (56 pt, hugging its label unless `fullWidth`).
+/// Use for the ONE primary action on a screen. Play's yellow gets ink text automatically.
 struct PrimaryButton: View {
     let title: String
     var accent: Color = Theme.text
+    var icon: String? = nil          // SF Symbol, e.g. "play.fill"
+    var fullWidth = false
     var isLoading = false
     let action: () -> Void
+
+    private var foreground: Color {
+        if accent == Theme.playAccent { return Theme.ink }
+        if accent == Theme.text { return Theme.background }
+        return .white
+    }
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                Text(title)
-                    .font(Theme.bodyBold)
-                    .opacity(isLoading ? 0 : 1)
+                HStack(spacing: 10) {
+                    if let icon {
+                        Image(systemName: icon).font(.system(size: 15, weight: .bold))
+                    }
+                    Text(title).font(Theme.headline)
+                }
+                .opacity(isLoading ? 0 : 1)
                 if isLoading {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(foreground)
                 }
             }
-            .foregroundStyle(accent == Theme.text ? Theme.background : .white)
-            .frame(maxWidth: .infinity)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 32)
+            .frame(minWidth: 200, maxWidth: fullWidth ? .infinity : nil)
             .frame(height: 56)
             .background(Capsule().fill(accent))
             .contentShape(Capsule())
@@ -37,7 +51,7 @@ struct TextButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(Theme.body)
+                .font(Theme.rowTitle)
                 .foregroundStyle(color)
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
@@ -51,7 +65,7 @@ struct Hairline: View {
     var body: some View {
         Rectangle()
             .fill(Theme.hairline)
-            .frame(height: 1 / UIScreen.main.scale)
+            .frame(height: 1)
             .frame(maxWidth: .infinity)
     }
 }
@@ -66,18 +80,62 @@ struct ModeDot: View {
     }
 }
 
-/// Caption-style label, used for small meta text.
+/// Small secondary meta text ("today's score", status lines).
 struct Caption: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text)
-            .font(Theme.caption)
+            .font(Theme.meta)
             .foregroundStyle(Theme.secondary)
     }
 }
 
-/// Standard screen chrome: off-white background, 24 pt margins, Nunito nav title.
+/// UPPERCASE section label ("SHEEP SAYS", "MODES").
+struct SectionLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text.uppercased())
+            .font(Theme.caption)
+            .tracking(Theme.Tracking.caption)
+            .foregroundStyle(Theme.secondary)
+    }
+}
+
+/// White rounded surface (radius 24, no shadow). Allowed ONLY for the Home message card,
+/// Settings groups and the tab bar.
+struct Surface<Content: View>: View {
+    var padding: EdgeInsets = Theme.cardPadding
+    @ViewBuilder var content: () -> Content
+    var body: some View {
+        content()
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
+    }
+}
+
+/// 44 pt circular icon button with a 1.5 pt outline (settings gear, close).
+struct IconCircleButton: View {
+    let systemName: String
+    var label: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Theme.text)
+                .frame(width: 44, height: 44)
+                .overlay(Circle().stroke(Theme.outline, lineWidth: Theme.outlineWidth))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+/// Standard screen chrome: fog background, 24 pt margins, Nunito nav title.
 struct Screen<Content: View>: View {
     var title: String?
     @ViewBuilder var content: () -> Content
