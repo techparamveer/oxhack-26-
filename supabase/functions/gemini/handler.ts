@@ -1,6 +1,8 @@
 // Gemini proxy for the Sheep iOS app.
 //
-// POST /functions/v1/gemini   (platform verify_jwt = on → caller is a signed-in, usually anonymous, user)
+// POST /functions/v1/gemini
+// Gateway verify_jwt stays on (rejects malformed JWTs). The function itself
+// returns 401 unless the quota RPC accepts the caller's user JWT.
 // body: { model?, systemInstruction, contents, generationConfig }
 // → Gemini's generateContent JSON, with Gemini's status code passed through so the
 //   app can fall back to its hardcoded copy on any non-2xx.
@@ -56,14 +58,26 @@ export function projectApiKey(env: Deps["env"]): string | undefined {
   return env("SUPABASE_ANON_KEY");
 }
 
-type Quota = { allowed: boolean; reason?: string } | null;
+type QuotaOk = { allowed: boolean; reason?: string };
+type QuotaOutcome =
+  | { status: "ok"; quota: QuotaOk }
+  | { status: "unauthenticated" }
+  | { status: "unavailable" };
 
-/** Calls `rpc/consume_gemini_quota` as the caller (their JWT → RLS applies). null = quota service failed. */
-async function consumeQuota(req: Request, deps: Deps): Promise<Quota> {
+function bearerToken(req: Request): string | null {
+  const auth = req.headers.get("authorization");
+  if (!auth) return null;
+  const match = /^Bearer\s+(\S+)/i.exec(auth.trim());
+  return match?.[1] ?? null;
+}
+
+/** Calls `rpc/consume_gemini_quota` as the caller (their JWT → RLS applies). */
+async function consumeQuota(req: Request, deps: Deps): Promise<QuotaOutcome> {
+  const auth = req.headers.get("authorization");
+  if (!bearerToken(req) || !auth) return { status: "unauthenticated" };
   const base = deps.env("SUPABASE_URL");
   const apikey = projectApiKey(deps.env) ?? req.headers.get("apikey") ?? undefined;
-  const auth = req.headers.get("authorization");
-  if (!base || !apikey || !auth) return null;
+  if (!base || !apikey) return { status: "unavailable" };
   try {
     const res = await deps.fetch(`${base.replace(/\/$/, "")}/rest/v1/rpc/consume_gemini_quota`, {
       method: "POST",
@@ -71,14 +85,18 @@ async function consumeQuota(req: Request, deps: Deps): Promise<Quota> {
       body: "{}",
       signal: AbortSignal.timeout(3_000),
     });
+    if (res.status === 401 || res.status === 403) {
+      console.error("quota rpc failed", res.status, (await res.text()).slice(0, 200));
+      return { status: "unauthenticated" };
+    }
     if (!res.ok) {
       console.error("quota rpc failed", res.status, (await res.text()).slice(0, 200));
-      return null;
+      return { status: "unavailable" };
     }
-    return (await res.json()) as Quota;
+    return { status: "ok", quota: (await res.json()) as QuotaOk };
   } catch (e) {
     console.error("quota rpc error", String(e));
-    return null;
+    return { status: "unavailable" };
   }
 }
 
@@ -110,10 +128,17 @@ export function createHandler(deps: Deps): (req: Request) => Promise<Response> {
       return error(400, "INVALID_ARGUMENT", "contents is required");
     }
 
-    const quota = await consumeQuota(req, deps);
-    if (quota === null) return error(503, "UNAVAILABLE", "Quota check failed");
-    if (!quota.allowed) {
-      return error(429, "RESOURCE_EXHAUSTED", `Rate limit (${quota.reason ?? "quota"})`);
+    if (!bearerToken(req)) {
+      return error(401, "UNAUTHENTICATED", "Sign-in required");
+    }
+
+    const outcome = await consumeQuota(req, deps);
+    if (outcome.status === "unauthenticated") {
+      return error(401, "UNAUTHENTICATED", "Sign-in required");
+    }
+    if (outcome.status === "unavailable") return error(503, "UNAVAILABLE", "Quota check failed");
+    if (!outcome.quota.allowed) {
+      return error(429, "RESOURCE_EXHAUSTED", `Rate limit (${outcome.quota.reason ?? "quota"})`);
     }
 
     // Forward only the fields we expect; drop anything else (tools, safety overrides, …).

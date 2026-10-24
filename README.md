@@ -39,7 +39,7 @@ deno test supabase/functions/gemini/
 supabase functions deploy gemini --use-api
 ```
 
-JWT verification stays on through `config.toml`.
+Gateway `verify_jwt` stays on (rejects malformed JWTs), and the function itself returns 401 unless the quota RPC accepts the caller's user JWT.
 
 **Auth:** do not run `supabase config push` against this project. It would also flip remote email confirmations, TOTP MFA, OTP length and `site_url`. Set only the two anonymous-auth keys with the Management API. `$SUPABASE_ACCESS_TOKEN` is a personal access token from the dashboard (Account → Access Tokens), not the project's anon or service_role key.
 

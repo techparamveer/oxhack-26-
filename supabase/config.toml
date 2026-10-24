@@ -406,8 +406,8 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
 
-# Gemini proxy. Keep the platform JWT check on: the iOS app always sends the
-# (anonymous) user's access token in Authorization and the publishable key in apikey.
+# Gemini proxy. Gateway verify_jwt stays on (rejects malformed JWTs). The
+# function itself returns 401 unless the quota RPC accepts the caller's user JWT.
 [functions.gemini]
 enabled = true
 verify_jwt = true
