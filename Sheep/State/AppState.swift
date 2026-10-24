@@ -66,13 +66,29 @@ final class AppState {
         guard let data = defaults.data(forKey: Self.storageKey),
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
         isLoading = true
-        mode = snap.mode
         progress = snap.progress
         activeSession = snap.activeSession
         lastOutcome = snap.lastOutcome
         restSession = snap.restSession
         playSession = snap.playSession
         fastTimers = snap.fastTimers
+        mode = Self.modeForLaunch(snap)
         isLoading = false
+        if mode != snap.mode { save() }
+    }
+
+    /// A persisted mode only comes back if its matching session is still running. The Rest/Play
+    /// pickers set the mode before a session exists; killing the app there must relaunch Idle.
+    private static func modeForLaunch(_ snap: Snapshot) -> Mode {
+        switch snap.mode {
+        case .focus:
+            snap.activeSession == nil ? .idle : .focus
+        case .rest:
+            if let rest = snap.restSession, rest.endedAt == nil { .rest } else { .idle }
+        case .play:
+            if let play = snap.playSession, play.endedAt == nil { .play } else { .idle }
+        case .idle:
+            .idle
+        }
     }
 }

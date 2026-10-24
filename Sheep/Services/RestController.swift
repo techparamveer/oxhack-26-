@@ -115,7 +115,10 @@ enum RestController {
     @MainActor @discardableResult
     static func endRest(state: AppState, now: Date = .now, log: EventLog = .shared) -> Int {
         notifier.clear(id: restNotificationID)
-        guard let session = state.restSession else { state.setMode(.idle); return 0 }
+        guard let session = state.restSession else {
+            if state.mode == .rest { state.setMode(.idle) }
+            return 0
+        }
         let minutes = LimitClock.elapsedMinutes(startedAt: session.startedAt, now: now,
                                                 limitMinutes: session.limitMinutes, fast: state.fastTimers)
         let actual = Int(minutes.rounded())
@@ -145,7 +148,10 @@ enum RestController {
     @MainActor @discardableResult
     static func endPlay(state: AppState, now: Date = .now, log: EventLog = .shared) -> Int {
         notifier.clear(id: playNotificationID)
-        guard let session = state.playSession else { state.setMode(.idle); return 0 }
+        guard let session = state.playSession else {
+            if state.mode == .play { state.setMode(.idle) }
+            return 0
+        }
         let minutes = LimitClock.elapsedMinutes(startedAt: session.startedAt, now: now,
                                                 limitMinutes: session.limitMinutes, fast: state.fastTimers)
         let xp = XPRules.restOrPlay(actualMinutes: Int(minutes.rounded()), limitMinutes: session.limitMinutes)
