@@ -40,6 +40,8 @@ final class SheepSettings {
         didSet { defaults.set(blockedInFocus.map(\.rawValue), forKey: Key.blockedInFocus) }
     }
     var mutedWorkApps: [String] { didSet { defaults.set(mutedWorkApps, forKey: Key.mutedWorkApps) } }
+    /// Written by SetupView's "I've set these up" toggles (`ShortcutsDone`); read-only here.
+    private(set) var shortcutsDone: [String]
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -55,6 +57,7 @@ final class SheepSettings {
             blockedInFocus = Self.blockableSections
         }
         mutedWorkApps = defaults.stringArray(forKey: Key.mutedWorkApps) ?? Self.workApps
+        shortcutsDone = defaults.stringArray(forKey: Key.shortcutsDone) ?? []
     }
 
     /// Re-read everything (e.g. after another screen or a reset wrote the keys).
@@ -65,11 +68,12 @@ final class SheepSettings {
         pomodoroMinutes = fresh.pomodoroMinutes
         blockedInFocus = fresh.blockedInFocus
         mutedWorkApps = fresh.mutedWorkApps
+        shortcutsDone = fresh.shortcutsDone
     }
 
     /// How many of the Shortcut automations the user has marked as set up (written by SetupView).
     var shortcutsDoneCount: Int {
-        min(Self.shortcutsTotal, defaults.stringArray(forKey: Key.shortcutsDone)?.count ?? 0)
+        min(Self.shortcutsTotal, shortcutsDone.count)
     }
 
     func isBlocked(_ section: AppSection) -> Bool { blockedInFocus.contains(section) }

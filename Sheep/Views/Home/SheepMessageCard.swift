@@ -18,8 +18,11 @@ struct HomeMessage: Equatable {
     static func brief(headline: String, body: String, isFromMemory: Bool, now: Date = .now) -> HomeMessage? {
         guard !headline.isEmpty || !body.isEmpty else { return nil }
         if isFromMemory { return .fromMemory(headline: headline, body: body) }
+        // The first-day brief's headline is literally "How to start" — don't repeat the caption.
+        let title = headline.caseInsensitiveCompare("How to start") == .orderedSame
+            ? "\(greeting(now)). Ready to lock in?" : headline
         return HomeMessage(caption: "How to start", meta: now.formatted(date: .omitted, time: .shortened),
-                           headline: headline, body: body, isFromMemory: false)
+                           headline: title, body: body, isFromMemory: false)
     }
 
     /// Offline / no-brief copy for the selected mode. `running` = that mode already has a live session.

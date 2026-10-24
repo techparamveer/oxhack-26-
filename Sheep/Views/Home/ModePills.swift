@@ -23,7 +23,7 @@ struct ModePills: View {
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: Self.icon(mode))
-                        .font(.system(size: mode == .play ? 14 : 15, weight: .semibold))
+                        .font(.system(size: mode == .focus ? 17 : (mode == .play ? 14 : 15), weight: .semibold))
                     Text(value.map(String.init) ?? "–")
                         .font(Theme.pillNumber)
                         .monospacedDigit()

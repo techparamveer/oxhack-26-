@@ -22,7 +22,7 @@ struct ScoreHeader: View {
                     .font(Theme.score)
                     .tracking(Theme.Tracking.score)
                     .monospacedDigit()
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(score == nil ? Theme.tertiary : Theme.text)
                     .frame(height: 80)
                     .contentTransition(.numericText())
                 if let delta {
