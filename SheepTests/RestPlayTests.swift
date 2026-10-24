@@ -216,6 +216,40 @@ final class RestPlayTests: XCTestCase {
         XCTAssertEqual(spy.cleared, [RestController.restNotificationID])
     }
 
+    func testEndRestAndEndPlayWithoutSessionLeaveFocusAlone() {
+        let state = AppState(defaults: defaults)
+        state.activeSession = FocusSession(answers: ["a"], title: "Ch.3", opener: "", watchOut: "",
+                                           workstream: "", checklist: [], pomodoros: 1, pomodoroMinutes: 25,
+                                           startedAt: Date())
+        state.setMode(.focus)
+
+        XCTAssertEqual(RestController.endRest(state: state), 0)
+        XCTAssertEqual(state.mode, .focus)
+        XCTAssertNotNil(state.activeSession)
+
+        XCTAssertEqual(RestController.endPlay(state: state), 0)
+        XCTAssertEqual(state.mode, .focus)
+        XCTAssertNotNil(state.activeSession)
+    }
+
+    func testEndWithoutSessionIdlesOnlyTheModeBeingEnded() {
+        let state = AppState(defaults: defaults)
+        state.setMode(.rest)
+        XCTAssertEqual(RestController.endRest(state: state), 0)
+        XCTAssertEqual(state.mode, .idle)
+
+        state.setMode(.play)
+        XCTAssertEqual(RestController.endRest(state: state), 0)
+        XCTAssertEqual(state.mode, .play)
+
+        XCTAssertEqual(RestController.endPlay(state: state), 0)
+        XCTAssertEqual(state.mode, .idle)
+
+        state.setMode(.rest)
+        XCTAssertEqual(RestController.endPlay(state: state), 0)
+        XCTAssertEqual(state.mode, .rest)
+    }
+
     func testEndRestTwiceAwardsXPOnce() {
         let log = EventLog(fileURL: { self.tmp.appendingPathComponent("events.jsonl") })
         let state = AppState(defaults: defaults)
