@@ -7,14 +7,14 @@
 //
 // Pure handler (no globals) so it can be unit-tested with a fake fetch/env.
 
+// Flash-family only. 2.x is retired for new users; gemini-flash-latest currently resolves to 3.8.
 export const ALLOWED_MODELS = new Set<string>([
   "gemini-flash-latest",
   "gemini-flash-lite-latest",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-3-flash-preview",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
 ]);
 export const DEFAULT_MODEL = "gemini-flash-latest";
 export const UPSTREAM_TIMEOUT_MS = 15_000;

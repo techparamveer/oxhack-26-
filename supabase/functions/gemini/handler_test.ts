@@ -97,10 +97,21 @@ Deno.test("passes through upstream non-2xx status and body (e.g. 403 API_KEY_SER
 
 Deno.test("rejects models outside the allowlist without calling anything", async () => {
   const { handler, calls } = setup();
-  const res = await handler(req({ ...valid, model: "gemini-2.5-pro" }));
-  assertEquals(res.status, 400);
+  for (const model of ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview"]) {
+    const res = await handler(req({ ...valid, model }));
+    assertEquals(res.status, 400, model);
+  }
   assertEquals(calls.length, 0);
-  assertEquals(ALLOWED_MODELS.has("gemini-flash-latest"), true);
+  for (const model of [
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+  ]) {
+    assertEquals(ALLOWED_MODELS.has(model), true, model);
+  }
 });
 
 Deno.test("rejects bad bodies", async () => {
