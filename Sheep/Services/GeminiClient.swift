@@ -80,7 +80,7 @@ struct GeminiResult<T> {
 /// Order: Supabase `gemini` Edge Function (if configured) → direct key (if present) → fallback,
 /// all inside the prompt's single `timeout` budget.
 final class GeminiClient: @unchecked Sendable {
-    static let shared = GeminiClient(proxy: SupabaseClient.shared)
+    static let shared = GeminiClient(apiKey: DebugLaunch.isOffline ? "" : nil, proxy: SupabaseClient.shared)
 
     /// Rolling Flash alias; override with GEMINI_MODEL in Secrets.xcconfig.
     static let defaultModel = "gemini-flash-latest"

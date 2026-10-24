@@ -55,6 +55,7 @@ struct FocusSessionView: View {
                 HStack(spacing: Theme.space(3)) {
                     ForEach(WrappedApp.allCases) { app in
                         TextButton(title: app.title.lowercased()) { router.open(app) }
+                            .accessibilityIdentifier("focus.wrapper.\(app.rawValue)")
                     }
                     Spacer()
                 }
@@ -128,6 +129,7 @@ struct FocusSessionView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("focus.checklist.item")
                 .accessibilityAddTraits(item.done ? .isSelected : [])
+                .accessibilityIdentifier("focus.checklist.item")
                 Hairline()
             }
         }

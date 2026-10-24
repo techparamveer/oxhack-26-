@@ -66,6 +66,7 @@ struct TabBar: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Self.title(tab))
+        .accessibilityIdentifier("tab.\(tab.rawValue)")
         .accessibilityAddTraits(active ? .isSelected : [])
     }
 

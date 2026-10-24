@@ -45,6 +45,7 @@ struct ModePills: View {
         .buttonStyle(.plain)
         .animation(Theme.spring, value: active)
         .accessibilityLabel("\(mode.title), score \(value.map(String.init) ?? "none")")
+        .accessibilityIdentifier("home.pill.\(mode.rawValue)")
         .accessibilityAddTraits(active ? .isSelected : [])
     }
 

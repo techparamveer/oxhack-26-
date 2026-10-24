@@ -22,6 +22,7 @@ struct BlockedOverlay: View {
                 SheepView(woolStage: state.progress.woolStage, size: 140, mode: .focus, xp: state.progress.xp)
                 Text("Not now")
                     .font(Theme.title)
+                    .accessibilityIdentifier("blocked.title")
                     .foregroundStyle(Theme.text)
                     .padding(.top, Theme.space(4))
                 Text("you're focusing on \(Text(goal).font(Theme.nunito(17, weight: 800, italic: true)).foregroundStyle(Theme.text))")
@@ -33,7 +34,9 @@ struct BlockedOverlay: View {
                     .padding(.top, Theme.space(2))
                 Spacer()
                 PrimaryButton(title: "Back to focus", accent: Mode.focus.accent, action: backToFocus)
+                    .accessibilityIdentifier("blocked.backToFocus")
                 TextButton(title: "stay on the feed", action: onStay)
+                    .accessibilityIdentifier("blocked.stay")
                     .padding(.top, Theme.space(1))
             }
             .padding(.horizontal, Theme.margin)

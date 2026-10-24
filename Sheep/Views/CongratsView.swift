@@ -38,6 +38,7 @@ struct CongratsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.space(2))
                         .contentTransition(.numericText())
+                        .accessibilityIdentifier("focus.congrats.xp")
                     Caption("level \(state.progress.level)")
                         .frame(maxWidth: .infinity)
                         .padding(.top, Theme.space(1))
