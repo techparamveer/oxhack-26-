@@ -12,8 +12,9 @@ struct BlockedOverlay: View {
 
     var body: some View {
         ZStack {
-            // Scrim over the live page (no glass): the page stays faintly visible behind.
-            Theme.background.opacity(0.97).ignoresSafeArea()
+            // Opaque fog over the live page (no glass): the page stays alive underneath but never
+            // shows through, so the copy is crisp on busy pages (consent sheets, thumbnails).
+            Theme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer()
