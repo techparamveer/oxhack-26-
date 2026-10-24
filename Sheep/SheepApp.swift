@@ -15,6 +15,7 @@ struct SheepApp: App {
                 .environment(state)
                 .environment(router)
                 .onOpenURL { router.handle(url: $0, state: state) }
+                .consumesIntentRoutes(router: router, state: state)
                 .task { await NotificationService.shared.requestAuthorization() }
         }
     }
