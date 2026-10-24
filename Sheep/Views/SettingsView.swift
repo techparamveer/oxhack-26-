@@ -77,7 +77,7 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
-                case .notebook: NotebookView()
+                case .notebook: NotebookView().notebookOpensFilesInPlace()
                 case .pomodoro: PomodoroLengthView()
                 case .blocked: BlockedInFocusView()
                 case .workApps: MutedWorkAppsView()
