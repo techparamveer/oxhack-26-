@@ -101,10 +101,11 @@ final class SheepSettings {
         }
     }
 
-    /// Settings row value: "Set up", "1 of 2", "2 of 2".
+    /// Settings row value: "Set up", "1 of 2 on", "2 of 2 on" — same wording as Shortcuts setup.
     var homeScreenIconsSummary: String {
         let n = WrappedApp.allCases.filter(isOnHomeScreen).count
-        return n == 0 ? "Set up" : "\(n) of \(WrappedApp.allCases.count)"
+        let total = WrappedApp.allCases.count
+        return n == 0 ? "Set up" : "\(n) of \(total) on"
     }
 
     func isMuted(_ app: String) -> Bool { mutedWorkApps.contains(app) }
