@@ -1,0 +1,18 @@
+# Secrets — never commit
+Config/Secrets.xcconfig
+
+# Build output
+.build/
+build/
+DerivedData/
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+
+# Agent worktrees
+.claude/worktrees/

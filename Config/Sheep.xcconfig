@@ -1,0 +1,4 @@
+// Shared build settings. Secrets are optional so the project builds without a key.
+GEMINI_API_KEY =
+GEMINI_MODEL =
+#include? "Secrets.xcconfig"
