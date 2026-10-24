@@ -67,14 +67,78 @@ final class GeminiClientTests: XCTestCase {
 
 final class AppStateTests: XCTestCase {
     func testPersistsAcrossInstances() {
-        let defaults = UserDefaults(suiteName: "sheep-tests-\(UUID())")!
+        let name = "sheep-tests-\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
         let a = AppState(defaults: defaults)
         a.setMode(.rest)
         a.progress.add(130)
+        XCTAssertEqual(a.mode, .rest, "picker can sit in Rest while the app is running")
         let b = AppState(defaults: defaults)
-        XCTAssertEqual(b.mode, .rest)
+        XCTAssertEqual(b.mode, .idle, "Rest with no session must not survive relaunch")
         XCTAssertEqual(b.progress.xp, 130)
         XCTAssertEqual(b.progress.level, 1)
+    }
+
+    func testLoadDropsModeWhenNoMatchingSession() {
+        let name = "sheep-tests-mode-load-\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let state = AppState(defaults: defaults)
+
+        state.setMode(.focus)
+        XCTAssertEqual(state.mode, .focus)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .idle)
+
+        state.setMode(.rest)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .idle)
+
+        state.setMode(.play)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .idle)
+    }
+
+    func testLoadKeepsModeWhenMatchingSessionIsRunning() {
+        let name = "sheep-tests-mode-keep-\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let state = AppState(defaults: defaults)
+
+        state.activeSession = FocusSession(answers: ["a"], title: "Ch.3", opener: "", watchOut: "",
+                                           workstream: "", checklist: [], pomodoros: 1, pomodoroMinutes: 25,
+                                           startedAt: start)
+        state.setMode(.focus)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .focus)
+        XCTAssertNotNil(AppState(defaults: defaults).activeSession)
+
+        state.activeSession = nil
+        state.restSession = RestSession(activity: "Walk", limitMinutes: 30, startedAt: start)
+        state.setMode(.rest)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .rest)
+
+        state.restSession = nil
+        state.playSession = PlaySession(limitMinutes: 60, startedAt: start)
+        state.setMode(.play)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .play)
+    }
+
+    func testLoadTreatsEndedRestOrPlaySessionAsIdle() {
+        let name = "sheep-tests-mode-ended-\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let state = AppState(defaults: defaults)
+
+        state.restSession = RestSession(activity: "Walk", limitMinutes: 30, startedAt: start,
+                                        endedAt: start.addingTimeInterval(60))
+        state.setMode(.rest)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .idle)
+
+        state.restSession = nil
+        state.playSession = PlaySession(limitMinutes: 60, startedAt: start,
+                                        endedAt: start.addingTimeInterval(60))
+        state.setMode(.play)
+        XCTAssertEqual(AppState(defaults: defaults).mode, .idle)
     }
 
     @MainActor
