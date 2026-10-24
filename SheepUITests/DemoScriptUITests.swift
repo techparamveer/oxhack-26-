@@ -176,7 +176,7 @@ final class DemoScriptUITests: XCTestCase {
         tap("home.primary")
         waitFor(element("focus.intake.answer.0"), "Intake")
         shot("21-dark-focus-intake")
-        app.navigationBars.buttons.firstMatch.tap()
+        tap("screen.back")   // Screen's own outlined back button (the system nav bar is hidden)
         tap("home.settings")
         waitFor(element("settings.close"), "Settings sheet")
         shot("22-dark-settings")
