@@ -42,7 +42,7 @@ struct HomeView: View {
 
     private var modeActions: some View {
         VStack(spacing: Theme.space(1)) {
-            PrimaryButton(title: primaryTitle, accent: Mode.focus.accent) { go(.focus) }
+            PrimaryButton(title: primaryTitle, accent: Mode.focus.accent, icon: "play.fill") { go(.focus) }
             HStack {
                 TextButton(title: "rest") { go(.rest) }
                 Spacer()
@@ -63,7 +63,6 @@ struct HomeView: View {
                         .font(Theme.body)
                         .foregroundStyle(Theme.text)
                         .symbolRenderingMode(.monochrome)
-                        .fontWeight(.light)
                 }
                 .buttonStyle(.plain)
             }

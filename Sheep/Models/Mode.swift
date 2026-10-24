@@ -24,6 +24,15 @@ enum Mode: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Text/icon colour on a filled accent button (Play's yellow takes ink, not white).
+    var onAccent: Color {
+        switch self {
+        case .play: Theme.ink
+        case .idle: Theme.background
+        default: .white
+        }
+    }
+
     /// Modes the user can pick (Idle is the absence of a choice).
     static var selectable: [Mode] { [.focus, .rest, .play] }
 }

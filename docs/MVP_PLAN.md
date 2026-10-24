@@ -25,28 +25,45 @@
 - ⚠️ The file's default instance is **ExtraLight (200)** and its PostScript name is `Nunito-ExtraLight`. `Font.custom("Nunito", size:)` alone will render ExtraLight. Use a helper that sets the `wght` variation axis explicitly (see `Theme.swift` below).
 - Register in Info.plist `UIAppFonts` (`Nunito-Variable.ttf`, `Nunito-Italic-Variable.ttf`).
 
+**Source of truth for visuals: Paper file "Sheep App"** (https://app.paper.design/file/01M5Q56NPJ6C87X30DZ16SE70S). Artboards: `00 Home — Normal`, `01 Home — Focus`, `02 Home — Rest`, `03 Settings`. Read exact values with the Paper MCP (`get_jsx`, `get_computed_styles`) — never eyeball screenshots. Layout is inspired by Opal's home: title → hero mascot → score → mode pills → message → primary button → tab bar.
+
+**No thin type.** The user explicitly rejected the light/thin weights. Minimum weight anywhere is **400**; numbers and titles are heavy.
+
 **Type scale** (one family, contrast via size + weight only):
 | Token | Size / weight | Use |
 |---|---|---|
-| `display` | 64 / 300 | Pomodoro timer digits (monospaced digits) |
-| `title` | 28 / 700 | Screen titles, mode names |
-| `headline` | 20 / 700 | Nudge headline, card headlines |
-| `body` | 17 / 400 | Body text, daily brief, checklist |
-| `caption` | 13 / 600 | Labels, meta, small caps-ish UI |
+| `wordmark` | 34 / 900, tracking −0.03em | "sheep" title on Home, screen titles ("Settings") |
+| `score` | 72 / 900, tracking −0.03em | Today's score on Home |
+| `display` | 76 / 800, tracking −0.02em | Pomodoro timer digits (monospaced digits) |
+| `title` | 30 / 800 | Big headings (nudge headline, "Evening off.") |
+| `headline` | 17–18 / 800 | Message headline, primary button label, pill numbers (20/800) |
+| `body` | 16–17 / 500 | Body text, message body |
+| `label` | 15 / 700–800 | Mode label ("Focus mode"), pill captions, row titles 17/700 |
+| `caption` | 13 / 800, tracking 0.08em, UPPERCASE | Section labels ("SHEEP SAYS", "MODES") |
 
-**Colour:** near-monochrome.
-- Background `#FAFAF7` (warm off-white), text `#111111`, secondary text `#8A8A85`, hairline `#E8E8E3`.
-- Dark mode: background `#0E0E0D`, text `#F2F2EE`, secondary `#7A7A75`, hairline `#222220`.
-- **One accent per mode, used sparingly** (timer ring, active mode dot, primary button only): Focus `#3D5AFE`, Rest `#2E7D5B`, Play `#E07A2E`.
+**Colour** ("foggy field"):
+- Background `#ECEDEB` (fog), surfaces `#FFFFFF` (wool), text `#17191A`, body text `#4A4D4B`, secondary `#6E726F`, inactive outline `#CFD2CE`, hairline `#DCDEDA`. Score up `#2E7D5B`, score down / destructive `#B4442E`.
+- Dark mode: background `#0E0F0E`, surfaces `#1A1C1B`, text `#F2F2EE`, secondary `#8B8F8C`, outline `#2C2F2D`.
+- **One accent per mode, used sparingly** (mode label + dot, active pill outline, primary button): Focus `#3D5AFE`, Rest `#2E7D5B`, Play `#E8A93B` (Play button text is ink `#17191A`, not white).
+
+**Home layout** (top → bottom; see Paper artboards):
+1. Status bar, then header row: wordmark **"sheep"** left, **settings** button right (44 pt circle, 1.5 pt `#CFD2CE` outline, gear icon) → opens Settings. **No XP/level in the header.**
+2. **Hero sheep**, ~196 pt, centred near the top (where Opal's gem is). Asset depends on mode: `sheep-awake` (no mode), `sheep-focus` (reading), `sheep-rest` (sleeping), `sheep-play` (controller).
+3. Mode label with dot ("● Focus mode" / "● Rest mode" / "● No mode on") → **score** (72/900) with delta ("▲ 6") → caption "today's score".
+4. **Three mode pills** (Focus / Rest / Play): 96×44 capsule with icon + per-mode score (20/800), caption below. Active pill: white fill + 2.5 pt mode-accent outline; others: 1.5 pt `#CFD2CE` outline, caption `#6E726F`. Tapping a pill switches the selected mode.
+5. **Sheep message card** (white, radius 24, no shadow): caption ("SHEEP SAYS" / "HOW TO START") + right meta ("from memory" / time), headline 17/800, body 16/500. This is the daily brief / how-to message from memory (GEMINI_PROMPTS §1). Always tells the user what to do next.
+6. **Primary button** (hugging pill, 56 pt, play-triangle icon + "Start focus" / "Start rest" / "Start playing"), mode accent.
+7. **Tab bar** (floating white capsule, 1 pt hairline border): Home · Apps · Notebook. Active tab has fog-filled capsule.
+
+**Settings** (sheet from the gear): grouped white cards (radius 24) on fog, uppercase caption per group. Groups: **Sheep** (Voice: Lock in / Gentle segmented; Ask before acting toggle; What Sheep remembers → Notebook), **Modes** (Pomodoro length, Blocked in Focus, Work apps to mute, Shortcuts setup), **Privacy** (Memory stays on this phone; Forget everything — destructive red). Dev menu stays hidden behind long-press on the sheep.
 
 **Layout & components:**
-- 24 pt side margins, 8 pt spacing grid, generous vertical whitespace.
-- No gradients, no drop shadows, no glassmorphism, no card stacks. Separate with whitespace or a 1 px hairline.
-- Buttons: full-width pill, filled with mode accent for the one primary action per screen; secondary actions are plain text buttons.
-- Icons: SF Symbols, `.light` weight, only where they replace words.
-- Sheep: a simple line-drawn/flat sheep, monochrome; wool level shown by size of wool puff, not by badges or bars.
-- Motion: subtle springs (≤ 0.4 s), fades. Nudge overlay = blurred page behind + centered text, nothing flashy.
-- Copy is short and lowercase-friendly; one idea per screen.
+- 24 pt side margins (cards: 16 pt), 8 pt spacing grid.
+- No gradients (except the nudge scrim), no drop shadows, no glassmorphism. White rounded surfaces are allowed for the message card, settings groups and tab bar only.
+- One primary button per screen; secondary actions are plain text buttons.
+- Icons: simple 1.8–2 pt stroke icons (SF Symbols `.semibold` is fine).
+- Motion: subtle springs (≤ 0.4 s), fades. Hero sheep cross-fades when the mode changes.
+- Copy is short; the message card always says what to do next.
 
 ## Demo script (what must work live, ~3 min)
 1. Home: sheep with current wool/level + **daily brief from memory**: "Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40. Lock in today." Tap **Focus**.
