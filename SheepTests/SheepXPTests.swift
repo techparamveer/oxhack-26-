@@ -7,8 +7,8 @@ final class SheepXPTests: XCTestCase {
 
     func testWoolStageAcrossLevels() {
         let expected: [(xp: Int, stage: Int)] = [
-            (0, 0), (19, 0), (20, 1), (39, 1), (40, 2), (60, 3), (80, 4), (99, 4),
-            (100, 0), (120, 1), (399, 4), (400, 4), (450, 4), (1_000, 4)
+            (0, 0), (49, 0), (50, 1), (90, 1), (100, 1), (149, 1), (150, 2), (299, 2),
+            (300, 3), (499, 3), (500, 4), (1_000, 4), (-20, 0)
         ]
         for (xp, stage) in expected {
             XCTAssertEqual(progress(xp).woolStage, stage, "xp \(xp)")
@@ -19,6 +19,17 @@ final class SheepXPTests: XCTestCase {
         for xp in stride(from: -50, through: 1_200, by: 7) {
             XCTAssertTrue((0...4).contains(progress(xp).woolStage), "xp \(xp)")
         }
+    }
+
+    func testWoolStageIsMonotonic() {
+        var previous = 0
+        for xp in stride(from: 0, through: 1_200, by: 1) {
+            let stage = progress(xp).woolStage
+            XCTAssertGreaterThanOrEqual(stage, previous, "wool shrank going up to xp \(xp)")
+            previous = stage
+        }
+        // Losing 10 XP across a level boundary must not grow wool (was 0 → 4 at 100 → 90).
+        XCTAssertLessThanOrEqual(progress(90).woolStage, progress(100).woolStage)
     }
 
     func testLevelMath() {
