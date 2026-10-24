@@ -50,17 +50,19 @@ struct DevMenuView: View {
 /// Dev actions. Feature steps replace these bodies (memory seeding, consolidator).
 enum DevActions {
     static func seedYesterday(state: AppState) {
-        // Memory step: MemorySeeder.seedYesterday()
+        MemorySeeder.seedYesterday()
+        Task { @MainActor in
+            DailyBriefService.shared.invalidate()
+            await DailyBriefService.shared.refresh()
+        }
     }
 
     static func runConsolidator(state: AppState) async -> [String] {
-        // Memory step: await MemoryConsolidator.shared.run(reason: .dailyRollover)
-        []
+        await MemoryConsolidator.shared.run(reason: .dailyRollover, force: true)
     }
 
     static func resetAll(state: AppState) {
         state.resetAll()
-        EventLog.shared.clear()
-        try? FileManager.default.removeItem(at: AppPaths.memory)
+        MemoryReset.forgetEverything()
     }
 }
