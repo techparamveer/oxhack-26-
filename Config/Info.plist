@@ -39,8 +39,14 @@
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>SUPABASE_HOST</key>
 	<string>$(SUPABASE_HOST)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>shortcuts</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Sheep saves Home Screen icons to your photos.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Nunito-Variable.ttf</string>
