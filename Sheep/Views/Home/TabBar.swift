@@ -31,15 +31,16 @@ struct TabBar: View {
     @Binding var selection: HomeTab
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(HomeTab.allCases) { tab in
-                item(tab)
+        LiquidGlass.container {
+            HStack(spacing: 4) {
+                ForEach(HomeTab.allCases) { tab in
+                    item(tab)
+                }
             }
+            .padding(5)
+            .sheepGlassTabBarChrome()
+            .sensoryFeedback(.selection, trigger: selection)
         }
-        .padding(5)
-        .background(RoundedRectangle(cornerRadius: 32, style: .continuous).fill(Theme.surface))
-        .overlay(RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-        .sensoryFeedback(.selection, trigger: selection)
     }
 
     private func item(_ tab: HomeTab) -> some View {
@@ -57,11 +58,7 @@ struct TabBar: View {
             .foregroundStyle(active ? Theme.text : Theme.secondary)
             .frame(width: 92)
             .padding(.vertical, 8)
-            .background {
-                if active {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Theme.background)
-                }
-            }
+            .sheepGlassTabItemChrome(active: active)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
