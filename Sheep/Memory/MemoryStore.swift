@@ -153,7 +153,27 @@ final class MemoryStore: @unchecked Sendable {
         let base = root.standardizedFileURL
         let url = base.appendingPathComponent(trimmed).standardizedFileURL
         guard url.path.hasPrefix(base.path + "/") else { return nil }
+        // Symlinks: the deepest existing ancestor (or the file itself) must still resolve inside the root.
+        guard let realBase = Self.realPath(base) else { return url } // root not created yet → nothing to follow
+        var probe = url
+        while !fm.fileExists(atPath: probe.path), probe.path.count > base.path.count {
+            probe.deleteLastPathComponent()
+        }
+        if Self.isSymlink(url) { probe = url } // dangling link: resolve it rather than its parent
+        guard let realProbe = Self.realPath(probe),
+              realProbe == realBase || realProbe.hasPrefix(realBase + "/") else { return nil }
+        if realProbe == realBase && probe.path != base.path { return nil }
         return url
+    }
+
+    private static func realPath(_ url: URL) -> String? {
+        guard let p = realpath(url.path, nil) else { return nil }
+        defer { free(p) }
+        return String(cString: p)
+    }
+
+    private static func isSymlink(_ url: URL) -> Bool {
+        ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.type] as? FileAttributeType) == .typeSymbolicLink
     }
 
     func relativePath(_ url: URL) -> String {

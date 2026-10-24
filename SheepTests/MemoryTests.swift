@@ -93,6 +93,41 @@ final class MemoryTests: XCTestCase {
         XCTAssertTrue(store.write("workstreams/active/ok.md", content: "x"))
     }
 
+    func testSymlinkEscapeRefused() throws {
+        let fm = FileManager.default
+        let outside = tmp.appendingPathComponent("outside", isDirectory: true)
+        try fm.createDirectory(at: outside, withIntermediateDirectories: true)
+        try "secret".write(to: outside.appendingPathComponent("s.md"), atomically: true, encoding: .utf8)
+        XCTAssertTrue(store.write("ok.md", content: "x")) // creates the root
+        try fm.createSymbolicLink(at: store.root.appendingPathComponent("link"), withDestinationURL: outside)
+        try fm.createSymbolicLink(at: store.root.appendingPathComponent("file.md"),
+                                  withDestinationURL: outside.appendingPathComponent("s.md"))
+        try fm.createSymbolicLink(at: store.root.appendingPathComponent("dangling.md"),
+                                  withDestinationURL: outside.appendingPathComponent("nope.md"))
+        XCTAssertFalse(store.write("link/new.md", content: "x"))
+        XCTAssertNil(store.read("link/s.md"))
+        XCTAssertNil(store.read("file.md"))
+        XCTAssertFalse(store.write("file.md", content: "x"))
+        XCTAssertFalse(store.write("dangling.md", content: "x"))
+        XCTAssertFalse(store.delete("link/s.md"))
+        XCTAssertFalse(fm.fileExists(atPath: outside.appendingPathComponent("new.md").path))
+        XCTAssertFalse(fm.fileExists(atPath: outside.appendingPathComponent("nope.md").path))
+        XCTAssertEqual(try String(contentsOf: outside.appendingPathComponent("s.md"), encoding: .utf8), "secret")
+        XCTAssertTrue(store.write("knowledge/new.md", content: "x"), "normal nested writes still work")
+    }
+
+    func testWhatWorksTieOrderIsDeterministic() {
+        let ts = now
+        var a = WhatWorks(), b = WhatWorks()
+        let evs = ["zany", "calm", "firm"].map {
+            SheepEvent(ts: ts, type: .nudge, tone: $0, action: "back_to_focus", outcome: "ignored")
+        }
+        evs.forEach { a.add($0, calendar: cal) }
+        evs.reversed().forEach { b.add($0, calendar: cal) }
+        XCTAssertEqual(a.render(updated: "x"), b.render(updated: "x"))
+        XCTAssertEqual(a.byTone.map(\.tone), ["calm", "firm", "zany"])
+    }
+
     // MARK: Seeder
 
     func testSeederCreatesFilesWithValidHeaders() {

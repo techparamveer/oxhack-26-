@@ -287,12 +287,17 @@ struct WhatWorks: Equatable {
         return d.map { ($0.key, $0.value.0, $0.value.1) }
             .sorted { a, b in
                 let ra = Double(a.back) / Double(max(a.total, 1)), rb = Double(b.back) / Double(max(b.total, 1))
-                return ra != rb ? ra > rb : a.total > b.total
+                if ra != rb { return ra > rb }
+                return a.total != b.total ? a.total > b.total : a.tone < b.tone // deterministic on ties
             }
     }
 
     func render(updated: String) -> String {
-        let sorted = stats.sorted { $0.rate != $1.rate ? $0.rate > $1.rate : $0.total > $1.total }
+        let sorted = stats.sorted {
+            if $0.rate != $1.rate { return $0.rate > $1.rate }
+            if $0.total != $1.total { return $0.total > $1.total }
+            return ($0.tone, $0.action) < ($1.tone, $1.action)
+        }
         var lines = ["# What works", ""]
         let tones = byTone
         if let best = tones.first {
@@ -411,7 +416,10 @@ struct Patterns: Equatable {
     }
 
     func render(updated: String) -> String {
-        let sorted = lines.sorted { $0.count != $1.count ? $0.count > $1.count : $0.last > $1.last }
+        let sorted = lines.sorted {
+            if $0.count != $1.count { return $0.count > $1.count }
+            return $0.last != $1.last ? $0.last > $1.last : $0.label < $1.label
+        }
         var body = ["# Patterns", ""]
         let rendered = sorted.prefix(10).map { "- \($0.label) (seen \($0.count)×, last \($0.last))" }
         body.append(contentsOf: rendered)
