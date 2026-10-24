@@ -88,3 +88,17 @@ final class AppStateTests: XCTestCase {
         XCTAssertFalse(router.handle(url: URL(string: "sheep://open/tiktok")!, state: state))
     }
 }
+
+final class XPRulesTests: XCTestCase {
+    func testSessionEnd() {
+        XCTAssertEqual(XPRules.sessionEnd(focusedMinutes: 25, fast: false, completed: true, reflectionBonus: 20), 50 + 50 + 20)
+        XCTAssertEqual(XPRules.sessionEnd(focusedMinutes: 3, fast: true, completed: false, reflectionBonus: 99), 30 + 50)
+        XCTAssertEqual(XPRules.restOrPlay(actualMinutes: 50, limitMinutes: 45), 0)
+    }
+
+    func testProgressNeverNegative() {
+        var p = Progress(xp: 5)
+        p.add(XPRules.ignoredNudge)
+        XCTAssertEqual(p.xp, 0)
+    }
+}
