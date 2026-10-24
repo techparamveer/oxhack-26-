@@ -1,5 +1,40 @@
 import SwiftUI
 
+/// Copy for the blocked-section overlay. Tested independently of the view.
+enum BlockedCopy {
+    /// "Reels are off while you rest."
+    static func sectionNote(section: AppSection, mode: Mode) -> String {
+        "\(clause(section)) while you \(modeVerb(mode))"
+    }
+
+    static func clause(_ section: AppSection) -> String {
+        switch section {
+        case .reels: "Reels are off"
+        case .dms: "messages are off"
+        case .shorts: "Shorts are off"
+        case .explore: "Explore is off"
+        case .feed: "this is off"
+        }
+    }
+
+    static func modeVerb(_ mode: Mode) -> String {
+        switch mode {
+        case .focus: "focus"
+        case .rest: "rest"
+        case .play: "play"
+        case .idle: "idle"
+        }
+    }
+
+    static func backTitle(mode: Mode) -> String {
+        switch mode {
+        case .rest: "Back to rest"
+        case .play: "Back to play"
+        default: "Back to focus"
+        }
+    }
+}
+
 /// Calm overlay shown over the page (scrim, no glass) when the current mode blocks a section.
 struct BlockedOverlay: View {
     let app: WrappedApp
@@ -18,22 +53,31 @@ struct BlockedOverlay: View {
 
             VStack(spacing: 0) {
                 Spacer()
-                // Only Focus blocks, so this is the reading sheep.
-                SheepView(woolStage: state.progress.woolStage, size: 140, mode: .focus, xp: state.progress.xp)
+                SheepView(woolStage: state.progress.woolStage, size: 140, mode: sheepMode, xp: state.progress.xp)
                 Text("Not now")
                     .font(Theme.title)
                     .accessibilityIdentifier("blocked.title")
                     .foregroundStyle(Theme.text)
                     .padding(.top, Theme.space(4))
-                Text("you're focusing on \(Text(goal).font(Theme.nunito(17, weight: 800, italic: true)).foregroundStyle(Theme.text))")
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.bodyText)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, Theme.space(1))
-                Caption(sectionNote)
-                    .padding(.top, Theme.space(2))
+                if state.mode == .focus {
+                    Text("you're focusing on \(Text(goal).font(Theme.nunito(17, weight: 800, italic: true)).foregroundStyle(Theme.text))")
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.bodyText)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, Theme.space(1))
+                    Caption(BlockedCopy.sectionNote(section: section, mode: .focus).lowercased())
+                        .padding(.top, Theme.space(2))
+                } else {
+                    Text(BlockedCopy.sectionNote(section: section, mode: state.mode))
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.bodyText)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, Theme.space(1))
+                }
                 Spacer()
-                PrimaryButton(title: "Back to focus", accent: Mode.focus.accent, action: backToFocus)
+                PrimaryButton(title: BlockedCopy.backTitle(mode: state.mode),
+                              accent: buttonAccent,
+                              action: backToMode)
                     .accessibilityIdentifier("blocked.backToFocus")
                 TextButton(title: "stay on the feed", action: onStay)
                     .accessibilityIdentifier("blocked.stay")
@@ -47,29 +91,43 @@ struct BlockedOverlay: View {
         }
     }
 
+    private var sheepMode: Mode {
+        state.mode == .idle ? .focus : state.mode
+    }
+
+    private var buttonAccent: Color {
+        let mode = state.mode == .idle ? Mode.focus : state.mode
+        return mode.accent
+    }
+
     private var goal: String {
         let title = state.activeSession?.title.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return title.isEmpty ? "your goal" : title
     }
 
-    private var sectionNote: String {
-        let name: String = switch section {
-        case .reels: "reels"
-        case .dms: "messages"
-        case .shorts: "shorts"
-        case .feed: "this"
-        }
-        return "\(name) are off while you focus"
-    }
-
-    private func backToFocus() {
+    private func backToMode() {
         router.presentedWrapper = nil
-        if state.activeSession != nil {
-            if router.path.last != .focusSession {
+        switch state.mode {
+        case .focus:
+            if state.activeSession != nil {
+                if router.path.last != .focusSession {
+                    router.popToRoot()
+                    router.push(.focusSession)
+                }
+            } else {
                 router.popToRoot()
-                router.push(.focusSession)
             }
-        } else {
+        case .rest:
+            if router.path.last != .rest {
+                router.popToRoot()
+                router.push(.rest)
+            }
+        case .play:
+            if router.path.last != .play {
+                router.popToRoot()
+                router.push(.play)
+            }
+        case .idle:
             router.popToRoot()
         }
     }
