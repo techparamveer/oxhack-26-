@@ -266,7 +266,7 @@ final class InterventionTests: XCTestCase {
         XCTAssertEqual(input.total, 3)
         XCTAssertEqual(input.section, .feed)
         XCTAssertEqual(input.nudgesThisSession, 0)
-        XCTAssertEqual(input.minutesLeft, 1)          // 50 s into a 1-min Pomodoro → 1 (rounded up)
+        XCTAssertEqual(input.secondsLeft, 10)         // 50 s into a 1-min Pomodoro → 10 s left
     }
 
     // MARK: Scroll accounting
@@ -305,10 +305,10 @@ final class InterventionTests: XCTestCase {
 
     // MARK: Prompt & fallback
 
-    private func input(_ mode: Mode, minutes: Double = 3) -> NudgeInput {
+    private func input(_ mode: Mode, minutes: Double = 3, secondsLeft: Int = 12 * 60) -> NudgeInput {
         NudgeInput(mode: mode, app: .instagram, section: .feed, activeMinutes: minutes, nudgesThisSession: 1,
                    sessionTitle: mode == .focus ? "Dissertation ch.3 intro" : nil, done: 1, total: 3,
-                   minutesLeft: mode == .focus ? 12 : nil,
+                   secondsLeft: mode == .focus ? secondsLeft : nil,
                    restActivity: mode == .rest ? "netflix" : nil, restLimitMinutes: mode == .rest ? 45 : nil,
                    now: Date(timeIntervalSince1970: 1_800_000_000))
     }
@@ -325,6 +325,29 @@ final class InterventionTests: XCTestCase {
     func testFastFallbackUsesSeconds() {
         let n = NudgePrompt.fallback(input(.focus, minutes: 0.5))
         XCTAssertTrue(n.message.contains("30 seconds"), n.message)
+    }
+
+    /// ~30 s left must not read "1 min left" (the acceptance run's fast-timer nudge).
+    func testUnderAMinuteLeftCopy() {
+        let n = NudgePrompt.fallback(input(.focus, minutes: 0.5, secondsLeft: 30))
+        XCTAssertTrue(n.message.hasSuffix("Under a minute left in this pomodoro."), n.message)
+        XCTAssertFalse(n.message.contains("1 min left"), n.message)
+        let text = NudgePrompt.user(input(.focus, minutes: 0.5, secondsLeft: 30), memory: "MEM")
+        XCTAssertTrue(text.contains("checklist 1/3 done, under a minute left in Pomodoro"), text)
+        // Pomodoros all elapsed: no time-left sentence in the fallback, "0 min" for the model.
+        XCTAssertFalse(NudgePrompt.fallback(input(.focus, secondsLeft: 0)).message.contains("left in this"))
+        XCTAssertTrue(NudgePrompt.user(input(.focus, secondsLeft: 0), memory: "").contains("done, 0 min left in Pomodoro"))
+    }
+
+    func testTimeLeftRoundsToNearestMinute() {
+        XCTAssertNil(NudgePrompt.displayMinutes(secondsLeft: 59))
+        XCTAssertEqual(NudgePrompt.displayMinutes(secondsLeft: 60), 1)
+        XCTAssertEqual(NudgePrompt.displayMinutes(secondsLeft: 89), 1)
+        XCTAssertEqual(NudgePrompt.displayMinutes(secondsLeft: 90), 2)
+        XCTAssertEqual(NudgePrompt.displayMinutes(secondsLeft: 12 * 60 + 20), 12)
+        XCTAssertEqual(NudgePrompt.fallbackTimeLeft(150), " 3 min left in this pomodoro.")
+        XCTAssertEqual(NudgePrompt.fallbackTimeLeft(nil), "")
+        XCTAssertEqual(NudgePrompt.promptTimeLeft(nil), "n/a min")
     }
 
     func testRestFallbackIsGentleAndNamesPlan() {
@@ -381,10 +404,11 @@ final class InterventionTests: XCTestCase {
         let start = Date(timeIntervalSince1970: 0)
         var s = FocusSession(answers: [], title: "t", opener: "", watchOut: "", workstream: "", checklist: [],
                              pomodoros: 2, pomodoroMinutes: 25, startedAt: start)
-        XCTAssertEqual(NudgePrompt.minutesLeftInPomodoro(s, now: start + 10 * 60), 15)
-        XCTAssertEqual(NudgePrompt.minutesLeftInPomodoro(s, now: start + 30 * 60), 20)
-        XCTAssertEqual(NudgePrompt.minutesLeftInPomodoro(s, now: start + 60 * 60), 0)
+        XCTAssertEqual(NudgePrompt.secondsLeftInPomodoro(s, now: start + 10 * 60), 15 * 60)
+        XCTAssertEqual(NudgePrompt.secondsLeftInPomodoro(s, now: start + 30 * 60), 20 * 60)
+        XCTAssertEqual(NudgePrompt.secondsLeftInPomodoro(s, now: start + 60 * 60), 0)
         s.pomodoroMinutes = 1
-        XCTAssertEqual(NudgePrompt.minutesLeftInPomodoro(s, now: start + 30), 1)
+        XCTAssertEqual(NudgePrompt.secondsLeftInPomodoro(s, now: start + 30), 30)
+        XCTAssertEqual(NudgePrompt.secondsLeftInPomodoro(s, now: start + 29.4), 31)   // rounded up
     }
 }

@@ -241,7 +241,7 @@ final class ScrollMonitor {
                           sessionTitle: session?.title,
                           done: session?.doneCount ?? 0,
                           total: session?.checklist.count ?? 0,
-                          minutesLeft: session.map { NudgePrompt.minutesLeftInPomodoro($0, now: t) },
+                          secondsLeft: session.map { NudgePrompt.secondsLeftInPomodoro($0, now: t) },
                           restActivity: rest?.activity,
                           restLimitMinutes: rest?.limitMinutes,
                           now: t,

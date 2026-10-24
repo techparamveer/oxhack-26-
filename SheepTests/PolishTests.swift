@@ -224,7 +224,7 @@ final class PolishTests: XCTestCase {
 
     func testNudgeTemplateSendsNAWithoutFocusSession() {
         let input = NudgeInput(mode: .rest, app: .instagram, section: .feed, activeMinutes: 2, nudgesThisSession: 0,
-                               sessionTitle: nil, done: 0, total: 0, minutesLeft: nil, restActivity: "netflix",
+                               sessionTitle: nil, done: 0, total: 0, secondsLeft: nil, restActivity: "netflix",
                                restLimitMinutes: 45, now: .now)
         let text = NudgePrompt.user(input, memory: "MEM")
         XCTAssertTrue(text.contains("SESSION GOAL: rest — netflix, 45 min limit — checklist n/a done, n/a min left in Pomodoro"), text)

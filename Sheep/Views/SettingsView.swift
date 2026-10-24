@@ -41,7 +41,9 @@ struct SettingsView: View {
 
                     SettingsGroup("Modes") {
                         NavigationLink(value: SettingsRoute.pomodoro) {
-                            SettingsRow(title: "Pomodoro length", value: "\(settings.pomodoroMinutes) min")
+                            SettingsRow(title: "Pomodoro length",
+                                        value: SheepSettings.pomodoroRowValue(stored: settings.pomodoroMinutes,
+                                                                              fastTimers: state.fastTimers))
                         }
                         RowDivider()
                         NavigationLink(value: SettingsRoute.blocked) {

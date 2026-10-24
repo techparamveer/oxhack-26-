@@ -68,8 +68,11 @@ struct FocusSessionView: View {
                           isLoading: isFinishing, action: finish)
                 .accessibilityIdentifier("focus.session.finish")
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, Theme.space(2))
+                // Pinned above the home indicator; the checklist scrolls above it with a clear 24 pt gap.
+                .padding(.top, Theme.space(3))
+                .padding(.bottom, Theme.space(2))
                 .background(Theme.background)
+                .overlay(alignment: .top) { Hairline() }   // the checklist visibly scrolls under this edge
         }
     }
 

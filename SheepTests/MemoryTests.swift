@@ -199,7 +199,26 @@ final class MemoryTests: XCTestCase {
         XCTAssertTrue(works.contains("Firm nudges (back to focus): got you back 1 of 2"), works)
         XCTAssertTrue(works.contains("Playful nudges (close app): got you back 1 of 1"), works)
         XCTAssertTrue(works.contains("Naming the deadline"), "free-form notes are preserved")
-        XCTAssertTrue(result.learned.contains("Firm nudges got you back 1 of 2 times."), result.learned.joined(separator: " | "))
+        // All-time count (yesterday's seeded nudge + today's), so the line says so — the Congrats summary counts
+        // this session only ("1 of 1 nudges resisted this session").
+        XCTAssertTrue(result.learned.contains("Across the last two days, firm nudges got you back 1 of 2 times."),
+                      result.learned.joined(separator: " | "))
+    }
+
+    func testToneScopeIsHonestAboutTheSpan() {
+        func nudge(_ daysAgo: Int, _ tone: String = "firm") -> SheepEvent {
+            SheepEvent(ts: cal.date(byAdding: .day, value: -daysAgo, to: now)!, type: .nudge, tone: tone,
+                       action: "back_to_focus", outcome: "ignored")
+        }
+        XCTAssertEqual(Learned.toneScope("firm", total: 2, all: [nudge(0), nudge(0)], now: now, calendar: cal), "Today")
+        XCTAssertEqual(Learned.toneScope("firm", total: 2, all: [nudge(1), nudge(0)], now: now, calendar: cal),
+                       "Across the last two days")
+        XCTAssertEqual(Learned.toneScope("firm", total: 2, all: [nudge(9), nudge(0, "playful"), nudge(0)], now: now, calendar: cal),
+                       "Across the last 10 days")
+        // what-works holds more than the log (older history was pruned): don't claim a span.
+        XCTAssertEqual(Learned.toneScope("firm", total: 5, all: [nudge(0), nudge(0)], now: now, calendar: cal), "So far")
+        XCTAssertEqual(Learned.toneLine("firm", 1, 2, scope: "So far"), "So far, firm nudges got you back 1 of 2 times.")
+        XCTAssertEqual(Learned.toneLine("firm", 1, 1, scope: "Today"), "A firm nudge got you back. Noted for next time.")
     }
 
     func testConsolidatorRunOfflineAppliesAndSnapshots() async {

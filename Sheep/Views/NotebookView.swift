@@ -3,7 +3,7 @@ import SwiftUI
 /// Sheep's Notebook: every memory file Sheep keeps, grouped into calm sections.
 /// Read / edit / delete for trust + transparency (MVP_PLAN "Memory").
 ///
-/// Works as a tab root (no back button, bottom padding for the floating tab bar) and when pushed
+/// Works as a tab root (no back button; the floating tab bar's safe-area inset clears the footer) and when pushed
 /// (e.g. Settings → "What Sheep remembers"). Needs a NavigationStack ancestor to open files.
 ///
 /// Opening a file: by default pushes `Route.notebookFile(path)` through the `Router`, so the root
@@ -18,9 +18,6 @@ struct NotebookView: View {
     @State private var eventCount = 0
     @State private var snapshotCount = 0
     @State private var selected: NotebookEntry?
-
-    /// Clearance for the floating tab bar.
-    static let tabBarClearance: CGFloat = 100
 
     var body: some View {
         Screen {
@@ -40,7 +37,9 @@ struct NotebookView: View {
                     }
                     footer
                 }
-                .padding(.bottom, Self.tabBarClearance)
+                // The floating tab bar is a `safeAreaInset` on RootTabContent, so the ScrollView already
+                // insets its content above it; only breathing room here (no tab bar when pushed from Settings).
+                .padding(.bottom, Theme.space(3))
             }
             .scrollIndicators(.hidden)
         }

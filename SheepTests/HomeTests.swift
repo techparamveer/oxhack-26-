@@ -180,6 +180,19 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(s.blockedInFocus, [])
         XCTAssertEqual(s.blockedSummary, "Nothing")
     }
+
+    /// The row shows what Focus will actually plan; fast timers don't overwrite the stored choice.
+    @MainActor func testPomodoroRowShowsEffectiveLengthWithFastTimers() {
+        let s = SheepSettings(defaults: defaults)
+        s.pomodoroMinutes = 50
+        XCTAssertEqual(SheepSettings.pomodoroRowValue(stored: s.pomodoroMinutes, fastTimers: false), "50 min")
+        XCTAssertEqual(SheepSettings.pomodoroRowValue(stored: s.pomodoroMinutes, fastTimers: true), "1 min · fast timers")
+        XCTAssertEqual(SheepSettings(defaults: defaults).pomodoroMinutes, 50)
+        // Matches the length FocusController really uses.
+        let state = AppState(defaults: defaults)
+        state.fastTimers = true
+        XCTAssertEqual(FocusController.pomodoroMinutes(state: state, defaults: defaults), 1)
+    }
 }
 
 final class HomePrimaryTests: XCTestCase {

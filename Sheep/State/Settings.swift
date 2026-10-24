@@ -98,6 +98,12 @@ final class SheepSettings {
 
     // MARK: Display strings
 
+    /// Settings row value for Pomodoro length: the EFFECTIVE length (what Focus will actually plan).
+    /// Fast timers (dev menu) force 1-min Pomodoros without touching the stored choice.
+    static func pomodoroRowValue(stored: Int, fastTimers: Bool) -> String {
+        fastTimers ? "1 min · fast timers" : "\(stored) min"
+    }
+
     static func sectionTitle(_ section: AppSection) -> String {
         switch section {
         case .reels: "Reels"

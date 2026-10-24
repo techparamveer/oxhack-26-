@@ -164,6 +164,8 @@ final class DemoScriptUITests: XCTestCase {
         waitFor(text(containing: "Dissertation ch.3"), "Notebook lists the workstream memory file")
         XCTAssertTrue(text(containing: "Profile").exists, "Notebook lists profile.md")
         shot("15-notebook")
+        assertNotebookFooterClearsTabBar()
+        shot("16-notebook-footer")
     }
 
     /// Dark-mode pass over the main screens (fresh seeded state).
@@ -184,6 +186,8 @@ final class DemoScriptUITests: XCTestCase {
         tap("tab.notebook")
         waitFor(text(containing: "Dissertation ch.3"), "Notebook")
         shot("23-dark-notebook")
+        assertNotebookFooterClearsTabBar()
+        shot("24-dark-notebook-footer")
     }
 
     // MARK: - Helpers
@@ -210,6 +214,17 @@ final class DemoScriptUITests: XCTestCase {
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         } while Date() < deadline
+    }
+
+    /// Scroll the Notebook to the end: the privacy footer must sit above the floating tab bar, not under it.
+    private func assertNotebookFooterClearsTabBar(file: StaticString = #filePath, line: UInt = #line) {
+        app.swipeUp()
+        app.swipeUp()
+        let footer = text(containing: "Never messages")
+        waitFor(footer, "Notebook privacy footer", file: file, line: line)
+        let tab = element("tab.notebook")
+        XCTAssertLessThanOrEqual(footer.frame.maxY, tab.frame.minY - 5,
+                                 "Notebook footer hidden behind the tab bar", file: file, line: line)
     }
 
     private func element(_ id: String) -> XCUIElement {
