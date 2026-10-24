@@ -8,12 +8,14 @@ struct ModePills: View {
     let onSelect: (Mode) -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            ForEach(Mode.selectable) { mode in
-                pill(mode)
+        LiquidGlass.container {
+            HStack(spacing: 14) {
+                ForEach(Mode.selectable) { mode in
+                    pill(mode)
+                }
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private func pill(_ mode: Mode) -> some View {
@@ -30,11 +32,7 @@ struct ModePills: View {
                 }
                 .foregroundStyle(Theme.text)
                 .frame(width: 96, height: 44)
-                .background(Capsule().fill(active ? Theme.surface : Color.clear))
-                .overlay(
-                    Capsule().strokeBorder(active ? mode.accent : Theme.outline,
-                                           lineWidth: active ? Theme.activeOutlineWidth : Theme.outlineWidth)
-                )
+                .sheepGlassModePill(active: active, accent: mode.accent)
                 Text(mode.title)
                     .font(active ? Theme.labelBold : Theme.label)
                     .foregroundStyle(active ? Theme.text : Theme.secondary)

@@ -119,11 +119,11 @@ struct Surface<Content: View>: View {
         content()
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
+            .sheepGlassCard()
     }
 }
 
-/// 44 pt circular icon button with a 1.5 pt outline (settings gear, close).
+/// 44 pt circular icon button — Liquid Glass on iOS 26+, 1.5 pt outline on earlier OS (settings gear, close).
 struct IconCircleButton: View {
     let systemName: String
     var label: String
@@ -134,7 +134,7 @@ struct IconCircleButton: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .frame(width: 44, height: 44)
-                .overlay(Circle().stroke(Theme.outline, lineWidth: Theme.outlineWidth))
+                .sheepGlassCircleButtonChrome()
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
