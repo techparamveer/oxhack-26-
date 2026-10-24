@@ -7,10 +7,11 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var settings = SheepSettings.shared
     @State private var confirmForget = false
+    @State private var path: [SettingsRoute] = []
 
     var body: some View {
         @Bindable var settings = settings
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
@@ -46,9 +47,10 @@ struct SettingsView: View {
                                                                               fastTimers: state.fastTimers))
                         }
                         RowDivider()
-                        NavigationLink(value: SettingsRoute.blocked) {
-                            SettingsRow(title: "Blocked in Focus", value: settings.blockedSummary)
+                        NavigationLink(value: SettingsRoute.hiddenByMode) {
+                            SettingsRow(title: "Hidden by mode", value: settings.blockedSummary)
                         }
+                        .accessibilityIdentifier("settings.hiddenByMode")
                         RowDivider()
                         NavigationLink(value: SettingsRoute.workApps) {
                             SettingsRow(title: "Work apps to mute", value: settings.mutedSummary)
@@ -83,13 +85,20 @@ struct SettingsView: View {
             .scrollIndicators(.hidden)
             .background(Theme.background.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear { settings.reload() }   // also on pop back (e.g. after marking Shortcuts done)
+            .onAppear {
+                settings.reload()   // also on pop back (e.g. after marking Shortcuts done)
+                #if DEBUG
+                if DebugLaunchHooks.openHiddenByMode != nil, path.isEmpty {
+                    path = [.hiddenByMode]
+                }
+                #endif
+            }
             .buttonStyle(.plain)
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .notebook: NotebookView().notebookOpensFilesInPlace()
                 case .pomodoro: PomodoroLengthView()
-                case .blocked: BlockedInFocusView()
+                case .hiddenByMode: HiddenByModeView()
                 case .workApps: MutedWorkAppsView()
                 case .shortcuts: SetupView()
                 case .homeScreen: HomeScreenIconsView()
@@ -131,7 +140,7 @@ struct SettingsView: View {
 }
 
 enum SettingsRoute: Hashable {
-    case notebook, pomodoro, blocked, workApps, shortcuts, homeScreen
+    case notebook, pomodoro, hiddenByMode, workApps, shortcuts, homeScreen
 }
 
 /// Caption + white radius-24 card with rows (16 pt side margin).
@@ -193,18 +202,21 @@ struct RowDivider: View {
     }
 }
 
-/// "Lock in" / "Gentle" segmented capsule. Selected segment = ink fill, white text (inverted in dark).
-struct VoiceSegmented: View {
-    @Binding var selection: SheepVoice
+/// Ink-fill capsule segmented control (Voice, Hidden-by-mode picker). Selected = ink, white text.
+struct CapsuleSegmented<Item: Hashable>: View {
+    let items: [Item]
+    @Binding var selection: Item
+    let title: (Item) -> String
+    var accessibilityID: ((Item) -> String)?
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(SheepVoice.allCases) { voice in
-                let active = voice == selection
+            ForEach(items, id: \.self) { item in
+                let active = item == selection
                 Button {
-                    withAnimation(Theme.spring) { selection = voice }
+                    withAnimation(Theme.spring) { selection = item }
                 } label: {
-                    Text(voice.title)
+                    Text(title(item))
                         .font(Theme.nunito(14, weight: active ? 800 : 700))
                         .foregroundStyle(active ? Theme.surface : Theme.secondary)
                         .padding(.vertical, 5)
@@ -215,10 +227,30 @@ struct VoiceSegmented: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(active ? .isSelected : [])
+                .accessibilityIdentifier(accessibilityID?(item) ?? title(item))
             }
         }
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.background))
         .sensoryFeedback(.selection, trigger: selection)
+    }
+}
+
+/// "Lock in" / "Gentle" segmented capsule. Selected segment = ink fill, white text (inverted in dark).
+struct VoiceSegmented: View {
+    @Binding var selection: SheepVoice
+
+    var body: some View {
+        CapsuleSegmented(items: SheepVoice.allCases, selection: $selection, title: \.title)
+    }
+}
+
+/// Focus / Rest / Play picker — same capsule as `VoiceSegmented`.
+struct ModeSegmented: View {
+    @Binding var selection: Mode
+
+    var body: some View {
+        CapsuleSegmented(items: Mode.selectable, selection: $selection, title: \.title,
+                         accessibilityID: { "hiddenByMode.mode.\($0.rawValue)" })
     }
 }
