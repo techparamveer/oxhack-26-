@@ -42,6 +42,22 @@ struct AppsView: View {
                     .font(Theme.meta)
                     .foregroundStyle(Theme.secondary)
                     .padding(.top, Theme.space(2))
+
+                Hairline()
+                    .padding(.top, Theme.space(3))
+                Button { router.push(.homeScreenIcons) } label: {
+                    HStack {
+                        Text("Put these on your Home Screen")
+                            .font(Theme.rowTitle)
+                            .foregroundStyle(Theme.text)
+                        Spacer(minLength: 8)
+                        RowChevron()
+                    }
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("apps.homeScreenIcons")
             }
             .padding(.horizontal, Theme.margin)
             .padding(.bottom, Theme.space(2))

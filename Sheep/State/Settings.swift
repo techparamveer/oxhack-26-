@@ -26,6 +26,7 @@ final class SheepSettings {
         static let blockedInFocus = "sheep.blockedInFocus"     // [String] AppSection raw values
         static let mutedWorkApps = "sheep.mutedWorkApps"       // [String]
         static let shortcutsDone = "sheep.shortcutsDone"       // [String] ids of Shortcut automations set up (SetupView)
+        static let homeScreenIcons = "sheep.homeScreenIcons"   // [String] WrappedApp raw values marked on the Home Screen
     }
 
     static let pomodoroOptions = [15, 25, 50]
@@ -42,6 +43,8 @@ final class SheepSettings {
     var mutedWorkApps: [String] { didSet { defaults.set(mutedWorkApps, forKey: Key.mutedWorkApps) } }
     /// Written by SetupView's "I've set these up" toggles (`ShortcutsDone`); read-only here.
     private(set) var shortcutsDone: [String]
+    /// WrappedApp raw values the user marked as on their Home Screen (`HomeScreenIconsView`).
+    var homeScreenIcons: [String] { didSet { defaults.set(homeScreenIcons, forKey: Key.homeScreenIcons) } }
 
     @ObservationIgnored private let defaults: UserDefaults
 
@@ -58,6 +61,7 @@ final class SheepSettings {
         }
         mutedWorkApps = defaults.stringArray(forKey: Key.mutedWorkApps) ?? Self.workApps
         shortcutsDone = defaults.stringArray(forKey: Key.shortcutsDone) ?? []
+        homeScreenIcons = defaults.stringArray(forKey: Key.homeScreenIcons) ?? []
     }
 
     /// Re-read everything (e.g. after another screen or a reset wrote the keys).
@@ -69,6 +73,7 @@ final class SheepSettings {
         blockedInFocus = fresh.blockedInFocus
         mutedWorkApps = fresh.mutedWorkApps
         shortcutsDone = fresh.shortcutsDone
+        homeScreenIcons = fresh.homeScreenIcons
     }
 
     /// How many of the Shortcut automations the user has marked as set up (written by SetupView).
@@ -84,6 +89,23 @@ final class SheepSettings {
         } else {
             blockedInFocus = Self.blockableSections.filter { $0 == section || blockedInFocus.contains($0) }
         }
+    }
+
+    func isOnHomeScreen(_ app: WrappedApp) -> Bool { homeScreenIcons.contains(app.rawValue) }
+
+    func toggleHomeScreen(_ app: WrappedApp) {
+        if isOnHomeScreen(app) {
+            homeScreenIcons.removeAll { $0 == app.rawValue }
+        } else {
+            homeScreenIcons = WrappedApp.allCases.map(\.rawValue).filter { $0 == app.rawValue || homeScreenIcons.contains($0) }
+        }
+    }
+
+    /// Settings row value: "Set up", "1 of 2 on", "2 of 2 on" — same wording as Shortcuts setup.
+    var homeScreenIconsSummary: String {
+        let n = WrappedApp.allCases.filter(isOnHomeScreen).count
+        let total = WrappedApp.allCases.count
+        return n == 0 ? "Set up" : "\(n) of \(total) on"
     }
 
     func isMuted(_ app: String) -> Bool { mutedWorkApps.contains(app) }

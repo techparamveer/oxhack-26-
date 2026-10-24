@@ -60,6 +60,13 @@ struct SettingsView: View {
                                         value: done == 0 ? "Set up" : "\(done) of \(SheepSettings.shortcutsTotal) on",
                                         valueColor: done == SheepSettings.shortcutsTotal ? Theme.scoreUp : Theme.secondary)
                         }
+                        RowDivider()
+                        NavigationLink(value: SettingsRoute.homeScreen) {
+                            SettingsRow(title: "Home Screen icons",
+                                        value: settings.homeScreenIconsSummary,
+                                        valueColor: WrappedApp.allCases.allSatisfy(settings.isOnHomeScreen)
+                                            ? Theme.scoreUp : Theme.secondary)
+                        }
                     }
 
                     SettingsGroup("Privacy") {
@@ -85,6 +92,7 @@ struct SettingsView: View {
                 case .blocked: BlockedInFocusView()
                 case .workApps: MutedWorkAppsView()
                 case .shortcuts: SetupView()
+                case .homeScreen: HomeScreenIconsView()
                 }
             }
             .confirmationDialog("Forget everything?", isPresented: $confirmForget, titleVisibility: .visible) {
@@ -123,7 +131,7 @@ struct SettingsView: View {
 }
 
 enum SettingsRoute: Hashable {
-    case notebook, pomodoro, blocked, workApps, shortcuts
+    case notebook, pomodoro, blocked, workApps, shortcuts, homeScreen
 }
 
 /// Caption + white radius-24 card with rows (16 pt side margin).

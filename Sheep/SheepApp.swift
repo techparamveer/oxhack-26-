@@ -50,6 +50,7 @@ struct RootView: View {
                     case .notebook: NotebookView()
                     case .notebookFile(let path): NotebookFileView(path: path)
                     case .setup: SetupView()
+                    case .homeScreenIcons: HomeScreenIconsView()
                     }
                 }
         }

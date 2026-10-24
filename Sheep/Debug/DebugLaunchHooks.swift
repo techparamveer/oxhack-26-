@@ -15,6 +15,7 @@ import WebKit
 /// | `-sheepFastTimers` | Forces fast timers on (1-min Pomodoros, 20 s Rest/Play overuse, 30 s scroll nudge). |
 /// | `-sheepOffline` | Gemini + Supabase skip the network → hardcoded fallbacks ("Wi-Fi off"). |
 /// | `-sheepOpenWrapper instagram\|youtube` | Presents that wrapper right after launch. |
+/// | `-sheepOpenHomeScreenIcons` | Pushes the Home Screen icons setup screen. |
 /// | `-sheepWrapperPath /reels/` | Every time a wrapper is presented, navigates it to this path (policy applies). |
 /// | `-sheepSimulateScroll <seconds>` | Every time a wrapper is presented, feeds that many seconds of synthetic feed scrolling into `ScrollMonitor`. |
 /// | `-sheepAppearance dark\|light` | Overrides the interface style for every window. |
@@ -81,6 +82,12 @@ enum DebugLaunchHooks {
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 600_000_000)
                 router.open(app)
+            }
+        }
+        if has("-sheepOpenHomeScreenIcons") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 400_000_000)
+                router.push(.homeScreenIcons)
             }
         }
         if DebugLaunch.isOffline { print("[Debug] -sheepOffline: Gemini + Supabase disabled, using fallbacks") }
