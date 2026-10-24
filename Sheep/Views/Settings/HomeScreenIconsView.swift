@@ -66,7 +66,8 @@ struct HomeScreenIconsView: View {
             for app in WrappedApp.allCases {
                 guard let image = icons[app] ?? HomeScreenIcon.render(app) else { continue }
                 icons[app] = image
-                if shareURLs[app] == nil { shareURLs[app] = writePNG(app, image) }
+                // Always rewrite: tmp can be purged while backgrounded, and ShareLink needs a live .png.
+                shareURLs[app] = HomeScreenIcon.writePNG(image, app: app)
             }
         }
     }
@@ -85,6 +86,7 @@ struct HomeScreenIconsView: View {
                             .accessibilityIdentifier("homeScreen.save.\(app.rawValue)")
                         shareButton(app)
                     }
+                    .frame(minHeight: 44)
                     status(app)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,8 +98,9 @@ struct HomeScreenIconsView: View {
 
     @ViewBuilder
     private func shareButton(_ app: WrappedApp) -> some View {
-        if let url = shareURLs[app] {
+        if let url = shareURLs[app], FileManager.default.fileExists(atPath: url.path) {
             ShareLink(item: url) {
+                // Same metrics as `TextButton` (ShareLink can't wrap a Button).
                 Text("Share icon")
                     .font(Theme.rowTitle)
                     .foregroundStyle(Theme.secondary)
@@ -128,7 +131,7 @@ struct HomeScreenIconsView: View {
         }
     }
 
-    /// Marks this app as on the Home Screen (Settings › Home Screen icons shows "n of 2").
+    /// Marks this app as on the Home Screen (Settings › Home Screen icons shows "n of 2 on").
     private func doneToggle(_ app: WrappedApp) -> some View {
         Toggle(isOn: Binding(get: { settings.isOnHomeScreen(app) },
                              set: { _ in settings.toggleHomeScreen(app) })) {
@@ -191,17 +194,5 @@ struct HomeScreenIconsView: View {
         let rendered = HomeScreenIcon.render(app)
         icons[app] = rendered
         return rendered
-    }
-
-    private func writePNG(_ app: WrappedApp, _ image: UIImage) -> URL? {
-        guard let data = image.pngData() else { return nil }
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("sheep-\(app.rawValue)-icon.png")
-        do {
-            try data.write(to: url, options: .atomic)
-            return url
-        } catch {
-            return nil
-        }
     }
 }
