@@ -61,6 +61,7 @@ struct HomeView: View {
                         .padding(.top, 20)
                     Spacer(minLength: 16)
                     PrimaryButton(title: plan.title, accent: plan.mode.accent, icon: "play.fill", action: start)
+                        .accessibilityIdentifier("home.primary")
                         .padding(.bottom, 14)
                 }
                 .frame(maxWidth: .infinity, minHeight: geo.size.height)
@@ -89,6 +90,7 @@ struct HomeView: View {
                 .foregroundStyle(Theme.text)
             Spacer()
             IconCircleButton(systemName: "gearshape", label: "Settings") { router.showSettings = true }
+                .accessibilityIdentifier("home.settings")
         }
         .padding(.horizontal, Theme.margin)
         .padding(.top, 4)

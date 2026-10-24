@@ -69,11 +69,13 @@ struct PlayView: View {
             PrimaryButton(title: "Start playing", accent: accent, icon: "play.fill") {
                 RestController.startPlay(limitMinutes: limit, state: state)
             }
+            .accessibilityIdentifier("play.start")
         } else {
             PrimaryButton(title: "End play", accent: accent, icon: "stop.fill") {
                 RestController.endPlay(state: state)
                 router.popToRoot()
             }
+            .accessibilityIdentifier("play.end")
         }
     }
 }

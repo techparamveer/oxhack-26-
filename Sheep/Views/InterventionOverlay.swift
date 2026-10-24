@@ -25,10 +25,12 @@ struct InterventionOverlay: View {
                     Text(nudge.headline)
                         .font(Theme.title)
                         .foregroundStyle(Theme.text)
+                        .accessibilityIdentifier("nudge.headline")
                     if !nudge.message.isEmpty {
                         Text(nudge.message)
                             .font(Theme.body)
                             .foregroundStyle(Theme.bodyText)
+                            .accessibilityIdentifier("nudge.message")
                     }
                 }
                 .multilineTextAlignment(.center)
@@ -39,6 +41,7 @@ struct InterventionOverlay: View {
                     PrimaryButton(title: nudge.primaryLabel, accent: request.mode.accent) {
                         choose(nudge.primaryAction)
                     }
+                    .accessibilityIdentifier("nudge.primary")
                     if nudge.primaryAction != .keepGoing {
                         TextButton(title: "keep scrolling", color: Theme.bodyText) { choose(.keepGoing) }
                     }

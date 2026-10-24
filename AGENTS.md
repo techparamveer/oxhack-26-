@@ -25,9 +25,11 @@ Use your OWN simulator so parallel agents don't collide:
 ```sh
 SIM="Sheep-$(basename "$PWD")"
 xcrun simctl create "$SIM" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro com.apple.CoreSimulator.SimRuntime.iOS-27-0 2>/dev/null || true
-xcodebuild -project Sheep.xcodeproj -scheme Sheep -destination "platform=iOS Simulator,name=$SIM" -derivedDataPath .build/DerivedData test 2>&1 | grep -E "error:|warning: .*Sheep/|failed|Executed|SUCCEEDED|FAILED"
+xcodebuild -project Sheep.xcodeproj -scheme Sheep -destination "platform=iOS Simulator,name=$SIM" -derivedDataPath .build/DerivedData -collect-test-diagnostics never test 2>&1 | grep -E "error:|warning: .*Sheep/|failed|Executed|SUCCEEDED|FAILED"
 ```
 Screenshot: `xcrun simctl boot "$SIM"; xcrun simctl install "$SIM" .build/DerivedData/Build/Products/Debug-iphonesimulator/Sheep.app; xcrun simctl launch "$SIM" com.oxhack.sheep; xcrun simctl io "$SIM" screenshot .build/shots/<name>.png`. Delete your simulator when done (`xcrun simctl delete "$SIM"`).
+
+Acceptance (end-to-end demo script, offline, ≈3 min): `scripts/acceptance.sh` (`FRESH=1` erases its sim first; shots → `/tmp/sheep-acceptance`). The `SheepUITests` suite is in the scheme but skips itself unless `TEST_RUNNER_SHEEP_ACCEPTANCE=1` is set, so the command above stays fast. Its DEBUG-only launch args (`-sheepReset`, `-sheepSeedYesterday`, `-sheepOffline`, …) are listed in `Sheep/Debug/DebugLaunchHooks.swift`; keep any new hook inside `#if DEBUG`. If you change a control the test drives, keep its `accessibilityIdentifier`.
 
 Tests: XCTest in `SheepTests/<Feature>Tests.swift`, `@testable import Sheep`. Test pure logic (policy, thresholds, XP, memory parsing, prompt fill, fallbacks). Use temp dirs (`AppPaths.root = tmp`, `EventLog(fileURL:)`) and `UserDefaults(suiteName:)` — never the real Documents/defaults.
 

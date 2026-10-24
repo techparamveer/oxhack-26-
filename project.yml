@@ -43,15 +43,30 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.oxhack.sheep.tests
         GENERATE_INFOPLIST_FILE: YES
+  SheepUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SheepUITests
+        type: syncedFolder
+    dependencies:
+      - target: Sheep
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oxhack.sheep.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Sheep
 schemes:
   Sheep:
     build:
       targets:
         Sheep: all
         SheepTests: [test]
+        SheepUITests: [test]
     test:
       targets:
         - SheepTests
+        - SheepUITests
       gatherCoverageData: false
     run:
       config: Debug

@@ -70,6 +70,7 @@ struct RestView: View {
                 customFocused = false
                 RestController.startRest(activity: chosenActivity, limitMinutes: limit, state: state)
             }
+            .accessibilityIdentifier("rest.start")
             .disabled(isCustom && custom.trimmingCharacters(in: .whitespaces).isEmpty)
             .frame(maxWidth: .infinity)
             .padding(.top, Theme.space(1))
@@ -92,6 +93,7 @@ struct RestView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityIdentifier("rest.activity.\(name.lowercased())")
     }
 
     private var customRow: some View {
@@ -131,6 +133,7 @@ struct RestView: View {
                 RestController.endRest(state: state)
                 router.popToRoot()
             }
+            .accessibilityIdentifier("rest.end")
             .frame(maxWidth: .infinity)
             .padding(.vertical, Theme.space(2))
         }
@@ -154,6 +157,7 @@ private struct RestWrappers: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("rest.wrapper.\(app.rawValue)")
                 }
             }
             Caption("DMs are open in rest")

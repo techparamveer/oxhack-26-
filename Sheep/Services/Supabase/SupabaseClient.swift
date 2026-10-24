@@ -5,8 +5,9 @@ import Foundation
 /// path except the Gemini proxy, which is always bounded by the prompt's timeout.
 final class SupabaseClient: @unchecked Sendable {
     /// nil when SUPABASE_HOST / SUPABASE_ANON_KEY aren't configured, and always nil under XCTest.
+    /// Also nil with the DEBUG `-sheepOffline` launch argument.
     static let shared: SupabaseClient? = {
-        guard !RuntimeEnvironment.isRunningTests, let config = SupabaseConfig.fromBundle() else { return nil }
+        guard !RuntimeEnvironment.isRunningTests, !DebugLaunch.isOffline, let config = SupabaseConfig.fromBundle() else { return nil }
         return SupabaseClient(config: config)
     }()
 

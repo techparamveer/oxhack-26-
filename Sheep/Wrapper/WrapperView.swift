@@ -50,6 +50,7 @@ struct WrapperView: View {
         ZStack {
             HStack {
                 IconCircleButton(systemName: "xmark", label: "Close \(app.title)") { close() }
+                    .accessibilityIdentifier("wrapper.close")
                 Spacer()
             }
             HStack(spacing: Theme.space(1)) {

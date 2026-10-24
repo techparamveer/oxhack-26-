@@ -18,6 +18,7 @@ struct SheepApp: App {
                 .environment(router)
                 .onOpenURL { router.handle(url: $0, state: state) }
                 .consumesIntentRoutes(router: router, state: state)
+                .debugLaunchHooks(state: state, router: router)   // DEBUG-only launch args (Sheep/Debug)
                 .task {
                     // Rollover first (idempotent, guarded by the persisted day) so the permission
                     // alert below — which keeps the scene `.inactive` — never delays it.

@@ -104,6 +104,7 @@ struct SettingsView: View {
                 .foregroundStyle(Theme.text)
             Spacer()
             IconCircleButton(systemName: "xmark", label: "Close") { dismiss() }
+                .accessibilityIdentifier("settings.close")
         }
         .padding(.horizontal, Theme.margin)
         .padding(.top, 20)

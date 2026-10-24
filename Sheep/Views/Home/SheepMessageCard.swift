@@ -87,5 +87,6 @@ struct SheepMessageCard: View {
         }
         .animation(Theme.spring, value: message)
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home.message")
     }
 }

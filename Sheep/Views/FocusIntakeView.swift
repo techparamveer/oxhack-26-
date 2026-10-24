@@ -62,6 +62,7 @@ struct FocusIntakeView: View {
                 .lineLimit(1...4)
                 .submitLabel(i < 2 ? .next : .done)
                 .focused($focusedStep, equals: i)
+                .accessibilityIdentifier("focus.intake.answer.\(i)")
                 .onChange(of: answers[i]) { _, new in
                     // Vertical fields insert a newline on return — treat it as "next".
                     if new.contains("\n") {
