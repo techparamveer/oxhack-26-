@@ -31,7 +31,6 @@ struct NotebookView: View {
                         .tracking(Theme.Tracking.wordmark)
                         .foregroundStyle(Theme.text)
                         .padding(.top, Theme.space(isPushed ? 1 : 2))
-                        .padding(.horizontal, Theme.margin - Theme.cardMargin)
                     if groups.isEmpty {
                         emptyState
                     } else {
@@ -44,8 +43,6 @@ struct NotebookView: View {
                 .padding(.bottom, Self.tabBarClearance)
             }
             .scrollIndicators(.hidden)
-            // Cards use the 16 pt card margin; text blocks add their own 24 pt.
-            .padding(.horizontal, Theme.cardMargin - Theme.margin)
         }
         .onAppear(perform: reload)
         .navigationDestination(item: $selected) { entry in
@@ -53,20 +50,14 @@ struct NotebookView: View {
         }
     }
 
+    /// Flat on fog (no white cards): caption + hairline-separated rows, same row type as Settings.
     private func section(_ group: NotebookGroup) -> some View {
-        VStack(alignment: .leading, spacing: Theme.space(1)) {
-            SectionLabel(group.section.title)
-                .padding(.horizontal, 20) // aligns with row text inside the card
-            Surface(padding: EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)) {
-                VStack(spacing: 0) {
-                    ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { Hairline() }
-                        row(entry)
-                    }
-                }
+        FlatGroup(group.section.title) {
+            ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 { Hairline() }
+                row(entry)
             }
         }
-        .padding(.top, Theme.space(3))
     }
 
     private func row(_ entry: NotebookEntry) -> some View {
@@ -81,9 +72,7 @@ struct NotebookView: View {
                     if let caption = entry.caption { Caption(caption) }
                 }
                 Spacer(minLength: Theme.space(1))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.tertiary)
+                RowChevron()
             }
             .padding(.vertical, 14)
             .frame(minHeight: 56)
@@ -106,7 +95,6 @@ struct NotebookView: View {
             #endif
         }
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, Theme.margin - Theme.cardMargin)
         .padding(.bottom, Theme.space(2))
     }
 
@@ -117,8 +105,7 @@ struct NotebookView: View {
             Caption("Only apps, times and your own words. Never messages.")
                 .padding(.top, Theme.space(1))
         }
-        .padding(.top, Theme.space(4))
-        .padding(.horizontal, Theme.margin - Theme.cardMargin)
+        .padding(.top, Theme.space(5))
     }
 
     private func open(_ entry: NotebookEntry) {
