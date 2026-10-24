@@ -52,20 +52,31 @@ enum PlannerPrompt {
                      schema: schema, temperature: temperature)
     }
 
-    /// Offline plan built only from the user's answers. Reads naturally, verb-first checklist of 3.
-    static func fallback(answers: [String], pomodoros: Int, minutes: Int, workstream: String? = nil) -> Response {
+    /// Offline plan built from the user's answers plus what's already on device: the workstream's
+    /// "next step" becomes the first item and yesterday's recap (`OfflineBrief.recapSentence`) opens it.
+    /// Reads naturally, verb-first checklist of 3.
+    static func fallback(answers: [String], pomodoros: Int, minutes: Int, workstream: String? = nil,
+                         nextStep: String? = nil, recap: String? = nil) -> Response {
         let a = padded(answers)
         let goal = shortGoal(a[0])
         let done = trimmed(a[1], max: 60)
         let distraction = trimmed(a[2], max: 40)
+        // "Plan the next chunk — last session was complete." → "Plan the next chunk"
+        let next = nextStep
+            .map { s in (s.components(separatedBy: " — ").first ?? s).trimmingCharacters(in: CharacterSet(charactersIn: " .")) }
+            .flatMap { $0.isEmpty ? nil : trimmed($0, max: 70) }
 
         let checklist = [
-            goal.isEmpty ? "Pick the one thing this session is for" : "Outline the next step of \(goal)",
+            next ?? (goal.isEmpty ? "Pick the one thing this session is for" : "Outline the next step of \(goal)"),
             done.isEmpty ? "Finish one solid chunk before checking anything" : "Get it to done: \(lowerFirst(done))",
             "Review what you did and note where to start next"
         ]
         let plural = pomodoros == 1 ? "Pomodoro" : "Pomodoros"
-        let opener = "\(pomodoros) \(plural), \(minutes) minutes. One item at a time, phone stays boring. Let's lock in."
+        var opener = "\(pomodoros) \(plural), \(minutes) minutes. One item at a time, phone stays boring. Let's lock in."
+        if let recap = recap?.trimmingCharacters(in: .whitespacesAndNewlines), !recap.isEmpty {
+            let withRecap = "\(recap) Today: \(pomodoros) \(plural), one item at a time."
+            if withRecap.split(separator: " ").count <= 25 { opener = withRecap }
+        }
         let watchOut = distraction.isEmpty
             ? "Reels and Shorts. If you drift, come straight back here."
             : "Watch for \(lowerFirst(distraction)). Drift? Come straight back here."
@@ -123,7 +134,8 @@ enum PlannerPrompt {
 /// The first active workstream (`workstreams/active/*.md`), parsed leniently, used to pre-fill intake Q1.
 struct ActiveWorkstream: Equatable {
     var slug: String      // file name without .md, e.g. "dissertation-ch3"
-    var goal: String      // e.g. "Dissertation ch.3 — due Fri 30 Oct"
+    var goal: String      // e.g. "Dissertation ch.3"
+    var nextStep: String? = nil   // e.g. "Write the 3 intro paragraphs from yesterday's outline"
 
     static func first(in files: [MemoryFile]) -> ActiveWorkstream? {
         files.filter { $0.path.hasPrefix("workstreams/active/") && $0.path.hasSuffix(".md") }
@@ -133,7 +145,9 @@ struct ActiveWorkstream: Equatable {
 
     static func current() -> ActiveWorkstream? { first(in: MemoryStore.shared.list()) }
 
-    /// Priority: body "goal:" line → header goal/title → first "# heading" → header id → slug.
+    /// Priority: first "# heading" (the workstream's name, e.g. "Dissertation ch.3") → header title/goal →
+    /// body "goal:" line → header id → slug. The name reads best as the Q1 answer and as the offline title;
+    /// the seeded/consolidated files all start their body with it.
     static func parse(path: String, content: String) -> ActiveWorkstream? {
         let slug = (path as NSString).lastPathComponent.replacingOccurrences(of: ".md", with: "")
         var header: [String: String] = [:]
@@ -152,25 +166,35 @@ struct ActiveWorkstream: Equatable {
         }
         body = Array(lines)
 
-        var goal: String?
-        for raw in body {
-            let line = clean(raw.replacingOccurrences(of: "**", with: ""))
-            let stripped = line.drop(while: { "-*• ".contains($0) })
-            if stripped.lowercased().hasPrefix("goal:") {
-                let value = clean(String(stripped.dropFirst(5)))
-                if !value.isEmpty { goal = value; break }
+        func nonEmpty(_ s: String?) -> String? { s.flatMap { $0.isEmpty ? nil : $0 } }
+        var goal = nonEmpty(body.first { $0.hasPrefix("# ") }.map { clean(String($0.dropFirst(2))) })
+        if goal == nil { goal = nonEmpty(header["title"]) ?? nonEmpty(header["goal"]) }
+        if goal == nil {
+            for raw in body {
+                let line = clean(raw.replacingOccurrences(of: "**", with: ""))
+                let stripped = line.drop(while: { "-*• ".contains($0) })
+                if stripped.lowercased().hasPrefix("goal:"), let value = nonEmpty(clean(String(stripped.dropFirst(5)))) {
+                    goal = value; break
+                }
             }
         }
-        if goal == nil { goal = [header["goal"], header["title"]].compactMap { $0 }.first { !$0.isEmpty } }
-        if goal == nil {
-            goal = body.first { $0.hasPrefix("# ") }.map { clean(String($0.dropFirst(2))) }
+        if goal == nil { goal = nonEmpty(header["id"]) }
+        if goal == nil { goal = nonEmpty(slug.replacingOccurrences(of: "-", with: " ").capitalized) }
+        guard let g = goal, !slug.isEmpty else { return nil }
+        return ActiveWorkstream(slug: slug, goal: g, nextStep: nextStep(in: body))
+    }
+
+    /// First bullet under "## Next step", if it reads like an action (used as the offline plan's first item).
+    static func nextStep(in body: [String]) -> String? {
+        guard let i = body.firstIndex(where: { $0.lowercased().hasPrefix("## next step") }) else { return nil }
+        for raw in body[(i + 1)...] {
+            if raw.hasPrefix("## ") { break }
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            guard line.hasPrefix("- ") || line.hasPrefix("* ") else { continue }
+            let text = clean(String(line.dropFirst(2))).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            return text.isEmpty ? nil : text
         }
-        if goal == nil || goal!.isEmpty { goal = header["id"].flatMap { $0.isEmpty ? nil : $0 } }
-        if goal == nil || goal!.isEmpty {
-            goal = slug.replacingOccurrences(of: "-", with: " ").capitalized
-        }
-        guard let g = goal, !g.isEmpty, !slug.isEmpty else { return nil }
-        return ActiveWorkstream(slug: slug, goal: g)
+        return nil
     }
 
     static func slug(_ s: String) -> String {

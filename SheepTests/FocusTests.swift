@@ -58,13 +58,58 @@ final class PlannerPromptTests: XCTestCase {
                      MemoryFile(path: "workstreams/active/dissertation-ch3.md", content: content)]
         let ws = ActiveWorkstream.first(in: files)
         XCTAssertEqual(ws?.slug, "dissertation-ch3")
-        XCTAssertEqual(ws?.goal, "Dissertation ch.3 — due Fri 30 Oct")
+        XCTAssertEqual(ws?.goal, "Dissertation chapter 3")
+        XCTAssertNil(ws?.nextStep)
+
+        let goalOnly = ActiveWorkstream.parse(path: "workstreams/active/g.md", content: "- **Goal:** Ship v1\n")
+        XCTAssertEqual(goalOnly?.goal, "Ship v1")
 
         let headingOnly = ActiveWorkstream.parse(path: "workstreams/active/x.md", content: "# Learn Swift\nnotes")
         XCTAssertEqual(headingOnly?.goal, "Learn Swift")
         let headerTitle = ActiveWorkstream.parse(path: "workstreams/active/y.md", content: "---\ntitle: \"Ship app\"\n---\n")
         XCTAssertEqual(headerTitle?.goal, "Ship app")
         XCTAssertNil(ActiveWorkstream.first(in: [MemoryFile(path: "workstreams/completed/z.md", content: "# Done")]))
+    }
+}
+
+final class FocusMemoryTests: XCTestCase {
+    private var root: URL!
+
+    override func setUp() {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("sheep-focus-mem-\(UUID())")
+    }
+
+    override func tearDown() { try? FileManager.default.removeItem(at: root) }
+
+    /// Q1 pre-fill uses the file the real MemorySeeder writes.
+    func testPrefillFromSeededWorkstream() {
+        let store = MemoryStore(root: root)
+        let log = EventLog(fileURL: { [root] in root!.appendingPathComponent("events.jsonl") })
+        let consolidator = MemoryConsolidator(store: store, log: log, client: GeminiClient(apiKey: "", model: nil),
+                                              defaults: UserDefaults(suiteName: "sheep-focus-mem-\(UUID())")!)
+        MemorySeeder.seedYesterday(store: store, log: log, consolidator: consolidator)
+        let ws = ActiveWorkstream.first(in: store.list())
+        XCTAssertEqual(ws?.slug, "dissertation-ch3")
+        XCTAssertEqual(ws?.goal, "Dissertation ch.3")
+        XCTAssertEqual(ws?.nextStep, "Write the 3 intro paragraphs from yesterday's outline")
+
+        // Offline plan carries memory: workstream next step first, yesterday's recap in the opener.
+        let today = Calendar.current.startOfDay(for: .now)
+        let recap = OfflineBrief.recapSentence(log.readAll().filter { $0.ts < today }, calendar: .current)
+        XCTAssertNotNil(recap)
+        let plan = PlannerPrompt.fallback(answers: [ws!.goal, "800 words", "instagram reels"], pomodoros: 3, minutes: 3,
+                                          workstream: ws?.slug, nextStep: ws?.nextStep, recap: recap)
+        XCTAssertEqual(plan.title, "Dissertation ch.3")
+        XCTAssertEqual(plan.workstream, "dissertation-ch3")
+        XCTAssertEqual(plan.checklist.first, "Write the 3 intro paragraphs from yesterday's outline")
+        XCTAssertTrue(plan.opener.hasPrefix("Yesterday you did 1 of 3"), plan.opener)
+        XCTAssertLessThanOrEqual(plan.opener.split(separator: " ").count, 25)
+    }
+
+    func testRecapTooLongFallsBackToDefaultOpener() {
+        let long = Array(repeating: "word", count: 24).joined(separator: " ")
+        let plan = PlannerPrompt.fallback(answers: ["a", "b", "c"], pomodoros: 2, minutes: 50, recap: long)
+        XCTAssertTrue(plan.opener.hasPrefix("2 Pomodoros, 50 minutes."))
     }
 }
 
@@ -216,6 +261,36 @@ final class FocusControllerTests: XCTestCase {
         XCTAssertEqual(end?.done, 3)
         XCTAssertEqual(end?.total, 3)
         XCTAssertEqual(end?.actualMin, 3)
+    }
+
+    func testStartEndsRunningRestAndKeepsOneMode() async {
+        let spy = SpyNotifier()
+        let saved = RestController.notifier
+        RestController.notifier = spy
+        defer { RestController.notifier = saved }
+        let start = Date()
+        let c = controller(start: start, now: { start }) { _ in [] }
+        RestController.startRest(activity: "Netflix", limitMinutes: 45, state: state, now: start.addingTimeInterval(-600))
+        XCTAssertEqual(state.mode, .rest)
+        let plan = PlannerPrompt.fallback(answers: ["a", "b", "c"], pomodoros: 1, minutes: 1)
+        c.start(plan: plan, answers: ["a", "b", "c"], pomodoros: 1, pomodoroMinutes: 1, state: state, router: router)
+        XCTAssertNil(state.restSession)
+        XCTAssertEqual(state.mode, .focus)
+        XCTAssertTrue(log.readAll().contains { $0.type == .restActivity })
+        XCTAssertNotNil(state.activeSession)
+    }
+
+    func testFinishTwiceIsANoOp() async {
+        let start = Date()
+        var calls = 0
+        let c = controller(start: start, now: { start.addingTimeInterval(60) }) { _ in calls += 1; return [] }
+        let plan = PlannerPrompt.fallback(answers: ["a", "b", "c"], pomodoros: 1, minutes: 1)
+        c.start(plan: plan, answers: ["a", "b", "c"], pomodoros: 1, pomodoroMinutes: 1, state: state, router: router)
+        async let first: Void = c.finish(state: state, router: router)
+        async let second: Void = c.finish(state: state, router: router)
+        _ = await (first, second)
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(log.readAll().filter { $0.type == .sessionEnd }.count, 1)
     }
 
     func testPomodoroMinutesSetting() {

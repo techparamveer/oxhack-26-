@@ -42,6 +42,8 @@ struct FocusIntakeView: View {
         }
         .onAppear(perform: prefill)
         .animation(Theme.spring, value: step)
+        // No leaving mid-plan: the planner task would otherwise start a session behind the user's back.
+        .navigationBarBackButtonHidden(isPlanning)
     }
 
     // MARK: Steps
@@ -157,10 +159,11 @@ struct FocusIntakeView: View {
         let answers = self.answers.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         let pomodoros = self.pomodoros
         let minutes = pomodoroMinutes
-        let slug = workstream?.slug
+        // Only tie the session to the notebook workstream if Q1 is still its (unedited) name.
+        let ws = workstream.flatMap { $0.goal == answers[0] ? $0 : nil }
         Task {
             let controller = FocusController.shared
-            let plan = await controller.makePlan(answers: answers, pomodoros: pomodoros, pomodoroMinutes: minutes, workstream: slug)
+            let plan = await controller.makePlan(answers: answers, pomodoros: pomodoros, pomodoroMinutes: minutes, workstream: ws)
             controller.start(plan: plan, answers: answers, pomodoros: pomodoros, pomodoroMinutes: minutes,
                              state: state, router: router)
             isPlanning = false

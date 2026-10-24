@@ -37,9 +37,13 @@ final class FocusController {
 
     // MARK: Plan + start
 
-    func makePlan(answers: [String], pomodoros: Int, pomodoroMinutes: Int, workstream: String?) async -> PlannerPrompt.Response {
+    /// `workstream` is the notebook workstream Q1 was pre-filled from — pass it only if Q1 still matches,
+    /// so an edited goal doesn't log progress against the wrong workstream.
+    func makePlan(answers: [String], pomodoros: Int, pomodoroMinutes: Int, workstream: ActiveWorkstream?) async -> PlannerPrompt.Response {
         let minutes = pomodoros * pomodoroMinutes
-        let fallback = PlannerPrompt.fallback(answers: answers, pomodoros: pomodoros, minutes: minutes, workstream: workstream)
+        let fallback = PlannerPrompt.fallback(answers: answers, pomodoros: pomodoros, minutes: minutes,
+                                              workstream: workstream?.slug, nextStep: workstream?.nextStep,
+                                              recap: yesterdayRecap())
         let prompt = PlannerPrompt.prompt(minutes: minutes, pomodoros: pomodoros, answers: answers,
                                           memory: memory(.planner(goal: answers.first ?? "")), now: clock())
         var plan = await gemini.generate(PlannerPrompt.Response.self, prompt, fallback: fallback).value
@@ -52,9 +56,21 @@ final class FocusController {
         return plan
     }
 
+    /// "Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40." — real logged events only.
+    func yesterdayRecap(calendar: Calendar = .current) -> String? {
+        let today = calendar.startOfDay(for: clock())
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else { return nil }
+        let events = eventLog.readAll().filter { $0.ts >= yesterday && $0.ts < today }.sorted { $0.ts < $1.ts }
+        return OfflineBrief.recapSentence(events, calendar: calendar)
+    }
+
     @discardableResult
     func start(plan: PlannerPrompt.Response, answers: [String], pomodoros: Int, pomodoroMinutes: Int,
                state: AppState, router: Router) -> FocusSession {
+        // One mode at a time: close a running Rest/Play block (logs it, clears its overuse notification).
+        if state.restSession != nil { RestController.endRest(state: state, now: clock(), log: eventLog) }
+        if state.playSession != nil { RestController.endPlay(state: state, now: clock(), log: eventLog) }
+        if let stale = state.activeSession { PomodoroTimer(session: stale).cancelNotifications() }
         let session = FocusSession(
             answers: answers,
             title: plan.title,
