@@ -82,7 +82,7 @@ struct ModeDot: View {
     let mode: Mode
     var body: some View {
         Circle()
-            .fill(mode == .idle ? Theme.secondary : mode.accent)
+            .fill(mode == .idle ? Theme.tertiary : mode.accent)
             .frame(width: 8, height: 8)
     }
 }
@@ -110,7 +110,7 @@ struct SectionLabel: View {
     }
 }
 
-/// White rounded surface (radius 24, no shadow). Allowed ONLY for the Home message card,
+/// White rounded surface (radius 24, no shadow, never glass). Allowed ONLY for the Home message card,
 /// Settings groups and the tab bar.
 struct Surface<Content: View>: View {
     var padding: EdgeInsets = Theme.cardPadding
@@ -123,7 +123,7 @@ struct Surface<Content: View>: View {
     }
 }
 
-/// 44 pt circular icon button — Liquid Glass on iOS 26+, 1.5 pt outline on earlier OS (settings gear, close).
+/// 44 pt circular icon button (settings gear, close, back) — one of the two places Liquid Glass is allowed (iOS 26+); 1.5 pt outline on earlier OS.
 struct IconCircleButton: View {
     let systemName: String
     var label: String

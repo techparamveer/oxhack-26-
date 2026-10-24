@@ -8,14 +8,12 @@ struct ModePills: View {
     let onSelect: (Mode) -> Void
 
     var body: some View {
-        LiquidGlass.container {
-            HStack(spacing: 14) {
-                ForEach(Mode.selectable) { mode in
-                    pill(mode)
-                }
+        HStack(spacing: 14) {
+            ForEach(Mode.selectable) { mode in
+                pill(mode)
             }
-            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func pill(_ mode: Mode) -> some View {
