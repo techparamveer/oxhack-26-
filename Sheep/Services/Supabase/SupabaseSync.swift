@@ -81,6 +81,9 @@ final class SupabaseSync: @unchecked Sendable {
     private var now: @Sendable () -> Date = { Date() }
     private var retryTask: Task<Void, Never>?
     private var observer: NSObjectProtocol?
+    /// Serial queue for everything that touches disk (queue load + persist on every enqueue), so the
+    /// hooks cost the caller (often the main thread) nothing and the order of writes is preserved.
+    private let work = DispatchQueue(label: "sheep.supabase.sync", qos: .utility)
 
     static let openSessionKey = "sheep.supabase.openSession"
     static var queueURL: URL { AppPaths.root.appendingPathComponent("sync/supabase-queue.json") }
@@ -93,7 +96,11 @@ final class SupabaseSync: @unchecked Sendable {
     /// Call once at launch. Signs in (anonymously) and flushes in the background.
     func start(client: SupabaseClient? = SupabaseClient.shared) {
         guard !RuntimeEnvironment.isRunningTests, let client else { return }
-        configure(sender: client, queue: SyncQueue(fileURL: Self.queueURL))
+        // Loading the persisted queue is disk I/O: do it on `work`; hooks queued behind it see it.
+        work.async { [weak self] in
+            self?.configure(sender: client, queue: SyncQueue(fileURL: Self.queueURL))
+            self?.flushSoon()   // anything left over from the last run
+        }
         observer = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil
         ) { [weak self] _ in
@@ -120,6 +127,10 @@ final class SupabaseSync: @unchecked Sendable {
     // MARK: - Hooks (called from EventLog / MemoryStore / scoring)
 
     func record(_ event: SheepEvent) {
+        work.async { [weak self] in self?.recordNow(event) }
+    }
+
+    private func recordNow(_ event: SheepEvent) {
         guard let queue = currentQueue() else { return }
         let id = UUID()
         queue.enqueue(.upsert("events", row: SupabaseRows.event(event, clientId: id),
@@ -139,26 +150,37 @@ final class SupabaseSync: @unchecked Sendable {
     }
 
     func memoryWritten(path: String, content: String) {
-        guard !path.hasPrefix("history/"), let queue = currentQueue() else { return }
-        queue.enqueue(.upsert("memory_files", row: SupabaseRows.memoryFile(path: path, content: content, updatedAt: currentNow()),
-                              onConflict: "user_id,path", key: path))
-        flushSoon()
+        let updatedAt = currentNow()
+        work.async { [weak self] in
+            guard let self, !path.hasPrefix("history/"), let queue = self.currentQueue() else { return }
+            queue.enqueue(.upsert("memory_files", row: SupabaseRows.memoryFile(path: path, content: content, updatedAt: updatedAt),
+                                  onConflict: "user_id,path", key: path))
+            self.flushSoon()
+        }
     }
 
     func memoryDeleted(path: String) {
-        guard !path.hasPrefix("history/"), let queue = currentQueue() else { return }
-        queue.enqueue(.delete("memory_files", filters: ["path": path], key: path))
-        flushSoon()
+        work.async { [weak self] in
+            guard let self, !path.hasPrefix("history/"), let queue = self.currentQueue() else { return }
+            queue.enqueue(.delete("memory_files", filters: ["path": path], key: path))
+            self.flushSoon()
+        }
     }
 
     /// Seam for the Home score: call whenever today's score changes (upserts one row per day).
     func recordDailyScore(date: Date = .now, score: Int, focus: Int, rest: Int, play: Int) {
-        guard let queue = currentQueue() else { return }
-        let row = SupabaseRows.dailyScore(date: date, score: score, focus: focus, rest: rest, play: play,
-                                          updatedAt: currentNow())
-        queue.enqueue(.upsert("daily_scores", row: row, onConflict: "user_id,date", key: SupabaseRows.day(date)))
-        flushSoon()
+        let updatedAt = currentNow()
+        work.async { [weak self] in
+            guard let self, let queue = self.currentQueue() else { return }
+            let row = SupabaseRows.dailyScore(date: date, score: score, focus: focus, rest: rest, play: play,
+                                              updatedAt: updatedAt)
+            queue.enqueue(.upsert("daily_scores", row: row, onConflict: "user_id,date", key: SupabaseRows.day(date)))
+            self.flushSoon()
+        }
     }
+
+    /// Blocks until every hook called so far has been enqueued (tests only).
+    func waitForPendingWork() { work.sync {} }
 
     // MARK: - Flushing
 

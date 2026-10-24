@@ -506,6 +506,24 @@ final class SyncQueueTests: XCTestCase {
         XCTAssertEqual(q.pending.count, 2)
     }
 
+    func testLongOfflineStretchNeverDropsOps() async {
+        let clock = Clock()
+        let q = SyncQueue(fileURL: dir.appendingPathComponent("q.json"), now: { clock.now })
+        q.enqueue(event(1))
+        let sender = FakeSender()
+        sender.error = SupabaseError.offline
+        for _ in 0..<(SyncQueue.maxAttempts + 3) {
+            let r = await q.flush(using: sender)
+            XCTAssertEqual(r.dropped, 0)
+            clock.now.addTimeInterval(601)
+        }
+        XCTAssertEqual(q.pending.count, 1, "connectivity failures back off but never drop")
+        XCTAssertGreaterThan(q.pending[0].attempts, SyncQueue.maxAttempts)
+        sender.error = SupabaseError.http(503, "down")   // server errors still give up eventually
+        _ = await q.flush(using: sender)
+        XCTAssertTrue(q.pending.isEmpty)
+    }
+
     func testFlushEndToEndThroughSupabaseClient() async throws {
         MockURLProtocol.reset { r in r.url?.path == "/auth/v1/signup" ? .json(200, sessionJSON()) : .json(201, "") }
         defer { MockURLProtocol.reset() }
@@ -556,6 +574,7 @@ final class SupabaseSyncTests: XCTestCase {
         let end = SheepEvent(ts: Date(timeIntervalSince1970: 1600), type: .sessionEnd, mode: .focus, actualMin: 25, done: 2, total: 3, xp: 40)
         sync.record(start)
         sync.record(end)
+        sync.waitForPendingWork()
         let ops = queue.pending
         XCTAssertEqual(ops.map(\.table), ["events", "events", "sessions"])
         XCTAssertTrue(ops[0].ignoreDuplicates)
@@ -573,6 +592,7 @@ final class SupabaseSyncTests: XCTestCase {
         sync.memoryWritten(path: "history/2026/x.md", content: "old")
         sync.memoryWritten(path: "knowledge/patterns.md", content: "v2")
         sync.memoryDeleted(path: "people/sam.md")
+        sync.waitForPendingWork()
         let ops = queue.pending
         XCTAssertEqual(ops.count, 2)
         guard case .object(let row)? = ops[0].row else { return XCTFail() }
@@ -585,6 +605,7 @@ final class SupabaseSyncTests: XCTestCase {
     func testDailyScoreUpsertsOneRowPerDay() {
         sync.recordDailyScore(score: 50, focus: 40, rest: 10, play: 0)
         sync.recordDailyScore(score: 70, focus: 60, rest: 10, play: 0)
+        sync.waitForPendingWork()
         XCTAssertEqual(queue.pending.count, 1)
         XCTAssertEqual(queue.pending[0].onConflict, "user_id,date")
         guard case .object(let row)? = queue.pending[0].row else { return XCTFail() }

@@ -121,12 +121,15 @@ final class SyncQueue: @unchecked Sendable {
             } catch {
                 let supabaseError = error as? SupabaseError
                 let retryable = supabaseError?.isRetryable ?? true   // URLError etc. → retry later
-                let (dropped, failed) = markFailed(batch, retryable: retryable)
+                // Connectivity-class failures say nothing about the op itself: back off, but never drop
+                // (the queue is still bounded by `maxOps`), so a long offline stretch loses no data.
+                let transient = supabaseError == nil || supabaseError == .offline || supabaseError == .authUnavailable
+                let (dropped, failed) = markFailed(batch, retryable: retryable, transient: transient)
                 result.dropped += dropped
                 result.failed += failed
                 batch.forEach { skipped.insert($0.id) }
                 // Transport down / offline / auth down: stop rather than hammering with every other op.
-                if supabaseError == nil || supabaseError == .offline || supabaseError == .authUnavailable { break }
+                if transient { break }
             }
         }
 
@@ -148,7 +151,7 @@ final class SyncQueue: @unchecked Sendable {
         return Array(ready.filter { $0.batchable(with: first) }.prefix(Self.batchSize))
     }
 
-    private func markFailed(_ batch: [SyncOp], retryable: Bool) -> (dropped: Int, failed: Int) {
+    private func markFailed(_ batch: [SyncOp], retryable: Bool, transient: Bool) -> (dropped: Int, failed: Int) {
         lock.lock(); defer { lock.unlock() }
         let ids = Set(batch.map(\.id))
         var dropped = 0, failed = 0
@@ -157,7 +160,7 @@ final class SyncQueue: @unchecked Sendable {
             guard ids.contains(op.id) else { return op }
             var op = op
             op.attempts += 1
-            if !retryable || op.attempts >= Self.maxAttempts { dropped += 1; return nil }
+            if !retryable || (!transient && op.attempts >= Self.maxAttempts) { dropped += 1; return nil }
             op.nextAttemptAt = t.addingTimeInterval(Self.backoff(attempts: op.attempts))
             failed += 1
             return op
