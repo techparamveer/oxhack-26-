@@ -132,10 +132,14 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(s.voice, .lockIn)
         XCTAssertTrue(s.askBeforeActing)
         XCTAssertEqual(s.pomodoroMinutes, 25)
-        XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .shorts])
+        XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .explore, .shorts])
+        XCTAssertEqual(s.blocked(in: .rest), [.reels, .shorts])
+        XCTAssertTrue(s.blocked(in: .play).isEmpty)
+        XCTAssertTrue(s.blocked(in: .idle).isEmpty)
         XCTAssertEqual(s.mutedWorkApps, ["Teams", "Outlook", "Slack"])
         XCTAssertEqual(s.shortcutsDoneCount, 0)
-        XCTAssertEqual(s.blockedSummary, "Reels, DMs, Shorts")
+        XCTAssertEqual(s.blockedSummary, "Focus: Reels, DMs +2")
+        XCTAssertLessThanOrEqual(s.blockedSummary.count, 20)
         XCTAssertEqual(s.mutedSummary, "3 apps")
         s.toggleMuted("Slack")
         XCTAssertEqual(s.mutedSummary, "Teams, Outlook")
@@ -152,14 +156,14 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "sheep.voice"), "gentle")
         XCTAssertEqual(defaults.object(forKey: "sheep.askBeforeActing") as? Bool, false)
         XCTAssertEqual(defaults.integer(forKey: "sheep.pomodoroMinutes"), 50)
-        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInFocus"), ["reels", "shorts"])
+        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInFocus"), ["explore", "reels", "shorts"])
         XCTAssertEqual(defaults.stringArray(forKey: "sheep.mutedWorkApps"), ["Teams", "Outlook"])
 
         let reloaded = SheepSettings(defaults: defaults)
         XCTAssertEqual(reloaded.voice, .gentle)
         XCTAssertFalse(reloaded.askBeforeActing)
         XCTAssertEqual(reloaded.pomodoroMinutes, 50)
-        XCTAssertEqual(reloaded.blockedInFocus, [.reels, .shorts])
+        XCTAssertEqual(reloaded.blockedInFocus, [.reels, .explore, .shorts])
         XCTAssertEqual(reloaded.mutedWorkApps, ["Teams", "Outlook"])
     }
 
@@ -167,9 +171,30 @@ final class SettingsTests: XCTestCase {
         let s = SheepSettings(defaults: defaults)
         s.toggleBlocked(.reels)
         s.toggleBlocked(.reels)
-        XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .shorts])
+        XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .explore, .shorts])
         s.toggleMuted("Teams"); s.toggleMuted("Teams")
         XCTAssertEqual(s.mutedWorkApps, ["Teams", "Outlook", "Slack"])
+    }
+
+    func testPerModeTogglePersistsAndReloadReadsNewKeys() {
+        let s = SheepSettings(defaults: defaults)
+        XCTAssertTrue(s.isBlocked(.reels, in: .rest))
+        XCTAssertFalse(s.isBlocked(.dms, in: .rest))
+        s.toggleBlocked(.dms, in: .rest)
+        s.toggleBlocked(.reels, in: .rest)
+        XCTAssertTrue(s.isBlocked(.dms, in: .rest))
+        XCTAssertFalse(s.isBlocked(.reels, in: .rest))
+        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInRest"), ["dms", "shorts"])
+        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInFocus"), nil,
+                       "Focus key stays unset until Focus is edited")
+
+        s.toggleBlocked(.explore, in: .play)
+        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInPlay"), ["explore"])
+
+        s.reload()
+        XCTAssertEqual(s.blocked(in: .rest), [.dms, .shorts])
+        XCTAssertEqual(s.blocked(in: .play), [.explore])
+        XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .explore, .shorts])
     }
 
     func testInvalidPomodoroFallsBackTo25AndEmptyBlockedIsRespected() {
@@ -178,7 +203,7 @@ final class SettingsTests: XCTestCase {
         let s = SheepSettings(defaults: defaults)
         XCTAssertEqual(s.pomodoroMinutes, 25)
         XCTAssertEqual(s.blockedInFocus, [])
-        XCTAssertEqual(s.blockedSummary, "Nothing")
+        XCTAssertEqual(s.blockedSummary, "Focus: none")
     }
 
     /// The row shows what Focus will actually plan; fast timers don't overwrite the stored choice.

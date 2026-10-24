@@ -21,7 +21,9 @@ final class PolicyTests: XCTestCase {
         let cases: [(String, AppSection)] = [
             ("/", .feed),
             ("", .feed),
-            ("/explore/", .feed),
+            ("/explore/", .explore),
+            ("/explore", .explore),
+            ("/explore/people/", .explore),
             ("/p/Cx1abc/", .feed),
             ("/stories/someone/123/", .feed),
             ("/reels/", .reels),
@@ -38,7 +40,8 @@ final class PolicyTests: XCTestCase {
             ("/direct/t/123/?foo=bar", .dms),
             ("/direct", .dms),
             ("/?next=/direct/inbox/", .feed),
-            ("/explore/?q=reels", .feed),
+            ("/explore/?q=reels", .explore),
+            ("https://www.instagram.com/explore/", .explore),
             ("https://www.instagram.com/reel/Cx1/", .reels),
             ("https://www.instagram.com/direct/inbox/", .dms),
             ("https://www.instagram.com/", .feed),
@@ -70,11 +73,11 @@ final class PolicyTests: XCTestCase {
     // MARK: Full policy table
 
     func testPolicyTable() {
-        let blockedInFocus: Set<AppSection> = [.reels, .dms, .shorts]
         for mode in Mode.allCases {
+            let blocked = Policy.defaultBlocked(in: mode)
             for app in WrappedApp.allCases {
                 for section in Policy.sections(of: app) {
-                    let expected = mode == .focus ? !blockedInFocus.contains(section) : true
+                    let expected = !blocked.contains(section)
                     XCTAssertEqual(Policy.isAllowed(section: section, mode: mode, defaults: defaults), expected, "\(mode) \(app) \(section)")
                 }
             }
@@ -84,7 +87,7 @@ final class PolicyTests: XCTestCase {
     func testIsAllowedByPath() {
         let table: [(WrappedApp, String, Mode, Bool)] = [
             (.instagram, "/", .focus, true),
-            (.instagram, "/explore/", .focus, true),
+            (.instagram, "/explore/", .focus, false),
             (.instagram, "/reels/", .focus, false),
             (.instagram, "/reel/Cx1/", .focus, false),
             (.instagram, "/direct/inbox/", .focus, false),
@@ -92,30 +95,60 @@ final class PolicyTests: XCTestCase {
             (.youtube, "/", .focus, true),
             (.youtube, "/watch?v=abc", .focus, true),
             (.youtube, "/shorts/abc", .focus, false),
+            (.instagram, "/reels/", .rest, false),
+            (.instagram, "/direct/inbox/", .rest, true),
+            (.instagram, "/explore/", .rest, true),
+            (.youtube, "/shorts/abc", .rest, false),
+            (.instagram, "/reels/", .play, true),
+            (.instagram, "/direct/inbox/", .play, true),
+            (.youtube, "/shorts/abc", .play, true),
+            (.instagram, "/reels/", .idle, true),
+            (.instagram, "/explore/", .idle, true),
+            (.youtube, "/shorts/abc", .idle, true),
         ]
         for (app, path, mode, expected) in table {
             XCTAssertEqual(Policy.isAllowed(app: app, path: path, mode: mode, defaults: defaults), expected, "\(app) \(path) \(mode)")
         }
-        for mode in [Mode.rest, .play, .idle] {
-            for (app, path) in [(WrappedApp.instagram, "/reels/"), (.instagram, "/direct/inbox/"), (.youtube, "/shorts/abc"), (.instagram, "/")] {
-                XCTAssertTrue(Policy.isAllowed(app: app, path: path, mode: mode, defaults: defaults), "\(app) \(path) \(mode)")
-            }
-        }
     }
 
     func testBlockedSections() {
-        XCTAssertEqual(Policy.blockedSections(app: .instagram, mode: .focus, defaults: defaults), [.reels, .dms])
+        XCTAssertEqual(Policy.blockedSections(app: .instagram, mode: .focus, defaults: defaults), [.reels, .explore, .dms])
         XCTAssertEqual(Policy.blockedSections(app: .youtube, mode: .focus, defaults: defaults), [.shorts])
-        for mode in [Mode.rest, .play, .idle] {
+        XCTAssertEqual(Policy.blockedSections(app: .instagram, mode: .rest, defaults: defaults), [.reels])
+        XCTAssertEqual(Policy.blockedSections(app: .youtube, mode: .rest, defaults: defaults), [.shorts])
+        for mode in [Mode.play, .idle] {
             for app in WrappedApp.allCases { XCTAssertTrue(Policy.blockedSections(app: app, mode: mode, defaults: defaults).isEmpty) }
         }
     }
 
-    // MARK: Blocked in Focus setting
+    // MARK: Per-mode settings
 
-    func testBlockedInFocusDefaultsToAllThree() {
+    func testDefaultBlockedPerMode() {
+        XCTAssertEqual(Policy.blockedKey(for: .focus), "sheep.blockedInFocus")
+        XCTAssertEqual(Policy.blockedKey(for: .rest), "sheep.blockedInRest")
+        XCTAssertEqual(Policy.blockedKey(for: .play), "sheep.blockedInPlay")
+        XCTAssertNil(Policy.blockedKey(for: .idle))
+
+        XCTAssertEqual(Policy.defaultBlocked(in: .focus), [.reels, .dms, .shorts, .explore])
+        XCTAssertEqual(Policy.defaultBlocked(in: .rest), [.reels, .shorts])
+        XCTAssertTrue(Policy.defaultBlocked(in: .play).isEmpty)
+        XCTAssertTrue(Policy.defaultBlocked(in: .idle).isEmpty)
+
+        XCTAssertEqual(Policy.blockedSections(in: .focus, defaults: defaults), [.reels, .dms, .shorts, .explore])
+        XCTAssertEqual(Policy.blockedSections(in: .rest, defaults: defaults), [.reels, .shorts])
+        XCTAssertTrue(Policy.blockedSections(in: .play, defaults: defaults).isEmpty)
+        XCTAssertTrue(Policy.blockedSections(in: .idle, defaults: defaults).isEmpty)
+        XCTAssertFalse(Policy.isAllowed(app: .instagram, path: "/direct/inbox/", mode: .focus, defaults: defaults))
+        XCTAssertTrue(Policy.isAllowed(app: .instagram, path: "/direct/inbox/", mode: .rest, defaults: defaults),
+                      "Rest keeps DMs open")
+    }
+
+    func testOldFocusKeyWithoutExploreStaysCompatible() {
+        defaults.set(["reels", "dms", "shorts"], forKey: "sheep.blockedInFocus")
         XCTAssertEqual(Policy.blockedSections(in: .focus, defaults: defaults), [.reels, .dms, .shorts])
-        for mode in [Mode.rest, .play, .idle] { XCTAssertTrue(Policy.blockedSections(in: mode, defaults: defaults).isEmpty) }
+        XCTAssertTrue(Policy.isAllowed(app: .instagram, path: "/explore/", mode: .focus, defaults: defaults),
+                      "existing installs without explore keep it open")
+        XCTAssertEqual(Policy.blockedInFocusKey, "sheep.blockedInFocus")
     }
 
     func testBlockedInFocusSettingDrivesPolicy() {
@@ -123,6 +156,7 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(defaults.array(forKey: "sheep.blockedInFocus") as? [String], ["reels"])
         XCTAssertFalse(Policy.isAllowed(app: .instagram, path: "/reels/", mode: .focus, defaults: defaults))
         XCTAssertTrue(Policy.isAllowed(app: .instagram, path: "/direct/inbox/", mode: .focus, defaults: defaults))
+        XCTAssertTrue(Policy.isAllowed(app: .instagram, path: "/explore/", mode: .focus, defaults: defaults))
         XCTAssertTrue(Policy.isAllowed(app: .youtube, path: "/shorts/abc", mode: .focus, defaults: defaults))
         XCTAssertEqual(Policy.hidingCSS(app: .youtube, mode: .focus, defaults: defaults), "")
         XCTAssertFalse(Policy.hidingCSS(app: .instagram, mode: .focus, defaults: defaults).contains("/direct/"))
@@ -135,14 +169,36 @@ final class PolicyTests: XCTestCase {
         XCTAssertTrue(Policy.isAllowed(app: .youtube, path: "/", mode: .focus, defaults: defaults))
     }
 
+    func testPerModeTogglesPersistAndRoundTrip() {
+        Policy.setBlocked([.reels, .explore], in: .focus, defaults: defaults)
+        Policy.setBlocked([.shorts], in: .rest, defaults: defaults)
+        Policy.setBlocked([.dms], in: .play, defaults: defaults)
+        Policy.setBlocked([.reels], in: .idle, defaults: defaults)
+
+        XCTAssertEqual(defaults.array(forKey: "sheep.blockedInFocus") as? [String], ["explore", "reels"])
+        XCTAssertEqual(defaults.array(forKey: "sheep.blockedInRest") as? [String], ["shorts"])
+        XCTAssertEqual(defaults.array(forKey: "sheep.blockedInPlay") as? [String], ["dms"])
+        XCTAssertNil(defaults.object(forKey: "sheep.blockedInIdle"))
+
+        XCTAssertEqual(Policy.blockedSections(in: .focus, defaults: defaults), [.reels, .explore])
+        XCTAssertEqual(Policy.blockedSections(in: .rest, defaults: defaults), [.shorts])
+        XCTAssertEqual(Policy.blockedSections(in: .play, defaults: defaults), [.dms])
+        XCTAssertTrue(Policy.blockedSections(in: .idle, defaults: defaults).isEmpty)
+
+        Policy.setBlocked([.feed, .reels], in: .rest, defaults: defaults)
+        XCTAssertEqual(Policy.blockedSections(in: .rest, defaults: defaults), [.reels], "feed is never stored")
+    }
+
     // MARK: CSS
 
     func testCSSEmptyWhenNothingBlocked() {
-        for mode in [Mode.rest, .play, .idle] {
+        for mode in [Mode.play, .idle] {
             for app in WrappedApp.allCases {
                 XCTAssertEqual(Policy.hidingCSS(app: app, mode: mode, defaults: defaults), "", "\(app) \(mode)")
             }
         }
+        XCTAssertEqual(Policy.hidingCSS(app: .instagram, mode: .rest, defaults: defaults).contains("/direct/"), false)
+        XCTAssertTrue(Policy.hidingCSS(app: .instagram, mode: .rest, defaults: defaults).contains("/reels/"))
     }
 
     func testFocusCSSHidesEntryPoints() {
@@ -150,8 +206,18 @@ final class PolicyTests: XCTestCase {
         XCTAssertTrue(ig.contains(#"a[href*="/reels/"]"#))
         XCTAssertTrue(ig.contains(#"a[href^="/direct/"]"#))
         XCTAssertTrue(ig.contains(#"a[href*="/direct/"]"#))
+        XCTAssertTrue(ig.contains(#"a[href^="/explore/"]"#))
+        XCTAssertTrue(ig.contains(#"a[href*="/explore/"]"#))
         XCTAssertTrue(ig.contains("display: none !important"))
         XCTAssertFalse(ig.contains("shorts"))
+
+        let restIG = Policy.hidingCSS(app: .instagram, mode: .rest, defaults: defaults)
+        XCTAssertTrue(restIG.contains(#"a[href*="/reels/"]"#))
+        XCTAssertFalse(restIG.contains("/explore/"), "explore hidden in Focus only")
+        XCTAssertFalse(restIG.contains("/direct/"))
+
+        let playIG = Policy.hidingCSS(app: .instagram, mode: .play, defaults: defaults)
+        XCTAssertFalse(playIG.contains("/explore/"))
 
         let yt = Policy.hidingCSS(app: .youtube, mode: .focus, defaults: defaults)
         XCTAssertTrue(yt.contains(#"a[href*="/shorts"]"#))
@@ -160,6 +226,26 @@ final class PolicyTests: XCTestCase {
         XCTAssertFalse(yt.contains("/direct/"))
         // One rule per selector.
         XCTAssertEqual(yt.components(separatedBy: "\n").count, Policy.hidingSelectors(app: .youtube, section: .shorts).count)
+    }
+
+    func testAppsCaptionsRestAndPlay() {
+        let allowed: (WrappedApp, String, Mode) -> Bool = { [defaults] app, path, mode in
+            Policy.isAllowed(app: app, path: path, mode: mode, defaults: defaults)
+        }
+        XCTAssertEqual(AppsCaption.wrapped(app: .instagram, mode: .rest, isAllowed: allowed), "Reels hidden")
+        XCTAssertEqual(AppsCaption.wrapped(app: .youtube, mode: .rest, isAllowed: allowed), "Shorts hidden")
+        XCTAssertEqual(AppsCaption.wrapped(app: .instagram, mode: .play, isAllowed: allowed), "Everything open in Play")
+        XCTAssertEqual(AppsCaption.wrapped(app: .youtube, mode: .play, isAllowed: allowed), "Everything open in Play")
+        XCTAssertEqual(AppsCaption.wrapped(app: .instagram, mode: .focus, isAllowed: allowed),
+                       "Reels, Explore and DMs hidden")
+    }
+
+    func testBlockedCopyReadsNaturally() {
+        XCTAssertEqual(BlockedCopy.sectionNote(section: .reels, mode: .rest), "Reels are off while you rest")
+        XCTAssertEqual(BlockedCopy.sectionNote(section: .explore, mode: .focus), "Explore is off while you focus")
+        XCTAssertEqual(BlockedCopy.sectionNote(section: .dms, mode: .focus), "messages are off while you focus")
+        XCTAssertEqual(BlockedCopy.backTitle(mode: .rest), "Back to rest")
+        XCTAssertEqual(BlockedCopy.backTitle(mode: .focus), "Back to focus")
     }
 
     // MARK: Hosts
