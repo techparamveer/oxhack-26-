@@ -1,17 +1,19 @@
 import Foundation
 
-/// Mode policy — single source of truth (MVP_PLAN "Mode policy").
+/// Mode policy — single source of truth (MVP_PLAN "Mode policy", Settings → "Hidden by mode").
 ///
-/// |                      | Focus   | Rest  | Play  | Idle  |
-/// |----------------------|---------|-------|-------|-------|
+/// Defaults (user-configurable per mode; the feed is never blocked; Idle never blocks):
+///
+/// |                      | Focus   | Rest    | Play    | Idle    |
+/// |----------------------|---------|---------|---------|---------|
 /// | Instagram feed       | allowed | allowed | allowed | allowed |
-/// | Instagram Reels      | blocked | allowed | allowed | allowed |
+/// | Instagram Reels      | blocked | blocked | allowed | allowed |
+/// | Instagram Explore    | blocked | allowed | allowed | allowed |
 /// | Instagram DMs        | blocked | allowed | allowed | allowed |
-/// | YouTube feed         | allowed | allowed | allowed | allowed |
-/// | YouTube Shorts       | blocked | allowed | allowed | allowed |
+/// | YouTube Shorts       | blocked | blocked | allowed | allowed |
 ///
-/// Which sections Focus blocks is user-configurable (Settings → "Blocked in Focus"), read only via
-/// `blockedSections(in:)`. Blocking is by URL path (robust); `hidingCSS` only hides entry points cosmetically.
+/// Read only via `blockedSections(in:)`. Blocking is by URL path (robust); `hidingCSS` only hides
+/// entry points cosmetically. Focus keeps the existing `sheep.blockedInFocus` key.
 enum Policy {
     /// Coarse section from a URL path (query/fragment ignored; a full URL is accepted too).
     static func section(app: WrappedApp, path: String) -> AppSection {
@@ -21,6 +23,7 @@ enum Policy {
             if parts.first == "direct" { return .dms }
             // `/reels/…`, `/reel/<id>/`, and a profile's reels tab `/<user>/reels/`.
             if parts.first == "reel" || parts.first == "reels" || parts.dropFirst().first == "reels" { return .reels }
+            if parts.first == "explore" { return .explore }
             return .feed
         case .youtube:
             return parts.first == "shorts" ? .shorts : .feed
@@ -35,21 +38,47 @@ enum Policy {
         !blockedSections(in: mode, defaults: defaults).contains(section)
     }
 
-    // MARK: Blocked in Focus (Settings drives this)
+    // MARK: Per-mode blocked sections (Settings drives this)
 
-    /// UserDefaults key: array of `AppSection` raw values blocked in Focus. Missing → all three.
+    /// UserDefaults key: array of `AppSection` raw values blocked in Focus. Missing → Focus defaults.
     static let blockedInFocusKey = "sheep.blockedInFocus"
-    static let defaultBlockedInFocus: Set<AppSection> = [.reels, .dms, .shorts]
+    static let blockedInRestKey = "sheep.blockedInRest"
+    static let blockedInPlayKey = "sheep.blockedInPlay"
 
-    /// THE single read of what a mode blocks. Only Focus blocks anything; the feed is never blocked.
+    static var defaultBlockedInFocus: Set<AppSection> { defaultBlocked(in: .focus) }
+
+    /// Persistence key for a mode's hidden sections. Idle has none.
+    static func blockedKey(for mode: Mode) -> String? {
+        switch mode {
+        case .focus: blockedInFocusKey
+        case .rest: blockedInRestKey
+        case .play: blockedInPlayKey
+        case .idle: nil
+        }
+    }
+
+    static func defaultBlocked(in mode: Mode) -> Set<AppSection> {
+        switch mode {
+        case .focus: [.reels, .dms, .shorts, .explore]
+        case .rest: [.reels, .shorts]
+        case .play, .idle: []
+        }
+    }
+
+    /// THE single read of what a mode blocks. The feed is never blocked.
     static func blockedSections(in mode: Mode, defaults: UserDefaults = .standard) -> Set<AppSection> {
-        guard mode == .focus else { return [] }
-        guard let raw = defaults.array(forKey: blockedInFocusKey) as? [String] else { return defaultBlockedInFocus }
+        guard let key = blockedKey(for: mode) else { return [] }
+        guard let raw = defaults.array(forKey: key) as? [String] else { return defaultBlocked(in: mode) }
         return Set(raw.compactMap(AppSection.init(rawValue:))).subtracting([.feed])
     }
 
+    static func setBlocked(_ sections: Set<AppSection>, in mode: Mode, defaults: UserDefaults = .standard) {
+        guard let key = blockedKey(for: mode) else { return }
+        defaults.set(sections.subtracting([.feed]).map(\.rawValue).sorted(), forKey: key)
+    }
+
     static func setBlockedInFocus(_ sections: Set<AppSection>, defaults: UserDefaults = .standard) {
-        defaults.set(sections.subtracting([.feed]).map(\.rawValue).sorted(), forKey: blockedInFocusKey)
+        setBlocked(sections, in: .focus, defaults: defaults)
     }
 
     /// Sections of `app` that `mode` blocks, in display order.
@@ -60,7 +89,7 @@ enum Policy {
 
     static func sections(of app: WrappedApp) -> [AppSection] {
         switch app {
-        case .instagram: [.feed, .reels, .dms]
+        case .instagram: [.feed, .reels, .explore, .dms]
         case .youtube: [.feed, .shorts]
         }
     }
@@ -78,6 +107,8 @@ enum Policy {
         switch (app, section) {
         case (.instagram, .reels):
             [#"a[href*="/reels/"]"#, #"a[href$="/reels"]"#, #"a[href^="/reel/"]"#, #"a[href*="/reel/"]"#]
+        case (.instagram, .explore):
+            [#"a[href^="/explore/"]"#, #"a[href*="/explore/"]"#]
         case (.instagram, .dms):
             [#"a[href^="/direct/"]"#, #"a[href*="/direct/"]"#, #"a[href$="/direct"]"#]
         case (.youtube, .shorts):
