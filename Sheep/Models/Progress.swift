@@ -7,11 +7,13 @@ struct Progress: Codable, Equatable {
 
     var level: Int { max(0, xp) / 100 }
 
-    /// 0…4. Grows every 20 XP within a level so wool visibly changes during a demo,
-    /// and a full fleece (stage 4) is shown at level ≥ 4.
+    /// XP needed for wool stages 1…4. Front-loaded so one demo session visibly grows wool
+    /// (ticking 3 checklist items reaches stage 1), and monotonic so losing XP never grows wool.
+    static let woolThresholds = [50, 150, 300, 500]
+
+    /// 0…4, never decreases as xp increases.
     var woolStage: Int {
-        if level >= 4 { return 4 }
-        return min(4, (max(0, xp) % 100) / 20)
+        Self.woolThresholds.filter { max(0, xp) >= $0 }.count
     }
 
     mutating func add(_ amount: Int) {
