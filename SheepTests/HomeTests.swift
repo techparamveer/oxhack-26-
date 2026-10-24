@@ -133,7 +133,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(s.askBeforeActing)
         XCTAssertEqual(s.pomodoroMinutes, 25)
         XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .explore, .shorts])
-        XCTAssertEqual(s.blocked(in: .rest), [.reels, .shorts])
+        XCTAssertTrue(s.blocked(in: .rest).isEmpty)
         XCTAssertTrue(s.blocked(in: .play).isEmpty)
         XCTAssertTrue(s.blocked(in: .idle).isEmpty)
         XCTAssertEqual(s.mutedWorkApps, ["Teams", "Outlook", "Slack"])
@@ -178,13 +178,13 @@ final class SettingsTests: XCTestCase {
 
     func testPerModeTogglePersistsAndReloadReadsNewKeys() {
         let s = SheepSettings(defaults: defaults)
-        XCTAssertTrue(s.isBlocked(.reels, in: .rest))
+        XCTAssertFalse(s.isBlocked(.reels, in: .rest))
         XCTAssertFalse(s.isBlocked(.dms, in: .rest))
         s.toggleBlocked(.dms, in: .rest)
         s.toggleBlocked(.reels, in: .rest)
         XCTAssertTrue(s.isBlocked(.dms, in: .rest))
-        XCTAssertFalse(s.isBlocked(.reels, in: .rest))
-        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInRest"), ["dms", "shorts"])
+        XCTAssertTrue(s.isBlocked(.reels, in: .rest))
+        XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInRest"), ["dms", "reels"])
         XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInFocus"), nil,
                        "Focus key stays unset until Focus is edited")
 
@@ -192,7 +192,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(defaults.stringArray(forKey: "sheep.blockedInPlay"), ["explore"])
 
         s.reload()
-        XCTAssertEqual(s.blocked(in: .rest), [.dms, .shorts])
+        XCTAssertEqual(s.blocked(in: .rest), [.reels, .dms])
         XCTAssertEqual(s.blocked(in: .play), [.explore])
         XCTAssertEqual(s.blockedInFocus, [.reels, .dms, .explore, .shorts])
     }

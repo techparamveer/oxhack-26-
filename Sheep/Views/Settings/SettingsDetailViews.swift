@@ -52,7 +52,7 @@ struct HiddenByModeView: View {
         case .focus:
             "Hidden inside Sheep's Instagram and YouTube while you focus."
         case .rest:
-            "Hidden inside Sheep's Instagram and YouTube while you rest. DMs stay open so you can talk to friends."
+            "Rest hides nothing by default."
         case .play:
             "Play hides nothing by default."
         case .idle:

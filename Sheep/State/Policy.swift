@@ -7,10 +7,10 @@ import Foundation
 /// |                      | Focus   | Rest    | Play    | Idle    |
 /// |----------------------|---------|---------|---------|---------|
 /// | Instagram feed       | allowed | allowed | allowed | allowed |
-/// | Instagram Reels      | blocked | blocked | allowed | allowed |
+/// | Instagram Reels      | blocked | allowed | allowed | allowed |
 /// | Instagram Explore    | blocked | allowed | allowed | allowed |
 /// | Instagram DMs        | blocked | allowed | allowed | allowed |
-/// | YouTube Shorts       | blocked | blocked | allowed | allowed |
+/// | YouTube Shorts       | blocked | allowed | allowed | allowed |
 ///
 /// Read only via `blockedSections(in:)`. Blocking is by URL path (robust); `hidingCSS` only hides
 /// entry points cosmetically. Focus keeps the existing `sheep.blockedInFocus` key.
@@ -60,8 +60,7 @@ enum Policy {
     static func defaultBlocked(in mode: Mode) -> Set<AppSection> {
         switch mode {
         case .focus: [.reels, .dms, .shorts, .explore]
-        case .rest: [.reels, .shorts]
-        case .play, .idle: []
+        case .rest, .play, .idle: []
         }
     }
 
