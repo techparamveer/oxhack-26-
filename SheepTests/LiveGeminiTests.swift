@@ -55,6 +55,7 @@ final class LiveGeminiTests: XCTestCase {
 
         for c in cases {
             var oks = 0
+            var inBudget = 0
             var times: [Int] = []
             var sample = ""
             var lastError = ""
@@ -62,6 +63,7 @@ final class LiveGeminiTests: XCTestCase {
             // Consolidator stays on its 15 s prompt budget; others get a diagnostic
             // window so we can report real latency past the app's 3 s fallback cut-off.
             let timeout = c.prompt.timeout >= 10 ? c.prompt.timeout : 20
+            let budgetMs = Int((c.prompt.timeout * 1000).rounded())
             for i in 1...3 {
                 let started = Date()
                 do {
@@ -70,6 +72,7 @@ final class LiveGeminiTests: XCTestCase {
                     let decoded = try c.decode(data)
                     let ms = millis(since: started)
                     times.append(ms)
+                    if ms <= budgetMs { inBudget += 1 }
                     if c.matchesFallback(decoded) {
                         lastError = "identical to hardcoded fallback"
                         if sample.isEmpty { sample = oneLine(decoded) }
@@ -80,20 +83,21 @@ final class LiveGeminiTests: XCTestCase {
                 } catch {
                     let ms = millis(since: started)
                     times.append(ms)
+                    if ms <= budgetMs { inBudget += 1 }
                     lastError = snippet(error)
                     if sample.isEmpty { sample = lastError }
                     print("LIVE| \(c.name) run \(i)/3 failed after \(ms)ms: \(lastError)")
                 }
             }
             if oks == 0 { failures.append("\(c.name): 0/3 (\(lastError))") }
-            rows.append(Row(name: c.name, ok: oks, times: times, sample: sample))
+            rows.append(Row(name: c.name, ok: oks, inBudget: inBudget, times: times, sample: sample))
         }
 
-        print("LIVE| prompt            ok    p50_ms  max_ms  sample")
+        print("LIVE| prompt            ok    inBudget p50_ms  max_ms  sample")
         for row in rows {
             let p50 = percentile(row.times, 0.5)
             let max = row.times.max() ?? 0
-            print("LIVE| \(pad(row.name, 16)) \(row.ok)/3   \(pad("\(p50)", 7)) \(pad("\(max)", 7)) \(row.sample)")
+            print("LIVE| \(pad(row.name, 16)) \(row.ok)/3   \(pad("\(row.inBudget)/3", 8)) \(pad("\(p50)", 7)) \(pad("\(max)", 7)) \(row.sample)")
         }
 
         if !failures.isEmpty {
@@ -113,6 +117,7 @@ final class LiveGeminiTests: XCTestCase {
     private struct Row {
         var name: String
         var ok: Int
+        var inBudget: Int
         var times: [Int]
         var sample: String
     }
