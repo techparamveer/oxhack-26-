@@ -46,7 +46,13 @@ curl -X PATCH 'https://api.supabase.com/v1/projects/wfrlvenjytnowvjuzgom/config/
   -d '{"external_anonymous_users_enabled": true, "rate_limit_anonymous_users": 300}'
 ```
 
-**App:** get the publishable key with `supabase projects api-keys --project-ref wfrlvenjytnowvjuzgom`. Put `SUPABASE_HOST = wfrlvenjytnowvjuzgom.supabase.co` (bare host; xcconfig treats `//` as a comment) and `SUPABASE_ANON_KEY = sb_publishable_…` into the git-ignored `Config/Secrets.xcconfig`. Never use the secret/service_role key.
+**App:** get the publishable key. Plain `supabase projects api-keys` would also print the legacy `service_role` JWT in full, so filter it:
+
+```sh
+supabase projects api-keys --project-ref wfrlvenjytnowvjuzgom -o json | jq -r '.[] | select(.type == "publishable") | .api_key'
+```
+
+Put `SUPABASE_HOST = wfrlvenjytnowvjuzgom.supabase.co` (bare host; xcconfig treats `//` as a comment) and `SUPABASE_ANON_KEY = sb_publishable_…` into the git-ignored `Config/Secrets.xcconfig`. Never use the secret/service_role key.
 
 **Checks:** Security/Performance advisors in the dashboard (or Management API `GET /v1/projects/{ref}/advisors/security|performance`). Remaining accepted items: INFO `unused_index` on a fresh DB.
 
