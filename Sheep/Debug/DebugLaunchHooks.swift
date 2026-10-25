@@ -20,6 +20,7 @@ import WebKit
 /// | `-sheepSimulateScroll <seconds>` | Every time a wrapper is presented, feeds that many seconds of synthetic feed scrolling into `ScrollMonitor`. |
 /// | `-sheepAppearance dark\|light` | Overrides the interface style for every window. |
 /// | `-sheepOpenHiddenByMode [focus\|rest\|play]` | Opens Settings on the Hidden-by-mode screen (optional mode). |
+/// | `-sheepRecordNotifications` | Exposes the last scheduled notification per id + its `add` result to UI tests (`NotificationRecorder`). |
 /// | `-sheepRunConsolidator` | (existing, `DailyRollover`) forces a consolidator run. |
 enum DebugLaunch {
     /// `-sheepOffline`: no Gemini / Supabase traffic, every prompt returns its fallback.
@@ -54,6 +55,9 @@ private struct DebugLaunchHooksModifier: ViewModifier {
             .onAppear { DebugLaunchHooks.launch(state: state, router: router) }
             .onChange(of: router.presentedWrapper) { _, app in
                 if let app { DebugLaunchHooks.wrapperPresented(app, state: state, router: router) }
+            }
+            .overlay(alignment: .topLeading) {
+                if NotificationRecorder.isEnabled { NotificationRecorderOverlay() }
             }
     }
 }

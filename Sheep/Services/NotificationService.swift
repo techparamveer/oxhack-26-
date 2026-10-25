@@ -155,6 +155,9 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
     private func schedule(id: String, title: String, body: String, after seconds: TimeInterval, onlyIfMissing: Bool) {
         let fireAt = Date().addingTimeInterval(max(1, seconds))
         let generation = bump(id)
+        #if DEBUG
+        NotificationRecorder.scheduled(id: id, title: title, body: body, fireAt: fireAt)
+        #endif
         Task { [id, title, body] in
             // Never `add` while `.notDetermined`. On iOS 27 that rejection
             // ("Source is not authorized") sticks until the simulator is erased,
@@ -166,6 +169,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
             guard granted else {
                 #if DEBUG
                 NSLog("[Notifications] skip \(id): not authorized")
+                NotificationRecorder.status(id: id, "denied")
                 #endif
                 return
             }
@@ -211,8 +215,14 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
                 NSLog("[Notifications] add \(id) ok")
             }
             #endif
-            guard let self, let error, self.isCurrent(id, generation), attempt < 4,
-                  error.localizedDescription.contains("not authorized") else { return }
+            guard let self, self.isCurrent(id, generation) else { return }
+            let retry = attempt < 4 && error?.localizedDescription.contains("not authorized") == true
+            #if DEBUG
+            NotificationRecorder.status(id: id, error.map {
+                (retry ? "retrying: " : "error: ") + NotificationRecorder.describe($0)
+            } ?? "ok")
+            #endif
+            guard retry else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 guard self.isCurrent(id, generation) else { return }
                 self.add(request, id: id, generation: generation, attempt: attempt + 1)
@@ -222,6 +232,9 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
 
     func cancel(id: String) {
         _ = bump(id)
+        #if DEBUG
+        NotificationRecorder.status(id: id, "cancelled")
+        #endif
         center.removePendingNotificationRequests(withIdentifiers: [id])
     }
 
