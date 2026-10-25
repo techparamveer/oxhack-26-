@@ -68,6 +68,7 @@ struct PlayView: View {
     @ViewBuilder private var primary: some View {
         if state.playSession == nil {
             PrimaryButton(title: "Start playing", accent: accent, icon: "play.fill") {
+                NotificationService.shared.requestAuthorizationSoon()
                 RestController.startPlay(limitMinutes: limit, state: state)
             }
             .accessibilityIdentifier("play.start")

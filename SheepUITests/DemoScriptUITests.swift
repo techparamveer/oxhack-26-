@@ -29,9 +29,11 @@ final class DemoScriptUITests: XCTestCase {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["SHEEP_ACCEPTANCE"] == "1",
                           "Acceptance UI test is opt-in: run scripts/acceptance.sh (sets SHEEP_ACCEPTANCE=1).")
         continueAfterFailure = false
-        // Backup for system alerts that appear while interacting (notification permission, "Open in…").
+        SystemAlert.reset()
+        // Open / keyboard tips only. Allow is tapped once in SystemAlert — a second
+        // tap (this monitor + dismissSystemAlerts) poisons the notification source.
         addUIInterruptionMonitor(withDescription: "System alerts") { alert in
-            for label in ["Allow", "Open", "OK", "Continue"] where alert.buttons[label].exists {
+            for label in ["Open", "OK", "Continue"] where alert.buttons[label].exists {
                 alert.buttons[label].tap()
                 return true
             }
@@ -128,6 +130,7 @@ final class DemoScriptUITests: XCTestCase {
         launch(["-sheepWrapperPath", "/direct/inbox/"])
         tap("home.pill.rest")
         tap("home.primary")
+        dismissSystemAlerts(timeout: 8)
         waitFor(element("rest.start"), "Rest picker")
         tap("rest.wrapper.instagram")
         waitFor(element("wrapper.close"), "Instagram wrapper in Rest")
@@ -136,11 +139,21 @@ final class DemoScriptUITests: XCTestCase {
         tap("wrapper.close")
         tap("rest.activity.netflix")
         tap("rest.start")
+        dismissSystemAlerts(timeout: 8)
         waitFor(element("rest.end"), "Rest running")
         shot("11-rest-netflix-running")
         let banner = springboard.descendants(matching: .any)
             .matching(NSPredicate(format: "label CONTAINS[c] %@", "netflix")).firstMatch
-        waitFor(banner, timeout: 45, "Rest overuse notification banner")
+        // iOS 27 / XCTest often defers the Allow sheet; keep dismissing it while we wait.
+        let bannerDeadline = Date().addingTimeInterval(70)
+        var sawBanner = false
+        while Date() < bannerDeadline {
+            if banner.waitForExistence(timeout: 1) { sawBanner = true; break }
+            dismissSystemAlerts(timeout: 1)
+        }
+        if !sawBanner {
+            waitFor(banner, timeout: 1, "Rest overuse notification banner")
+        }
         shot("12-rest-overuse-notification")
 
         // 7. Play briefly: muted work apps.
@@ -198,22 +211,13 @@ final class DemoScriptUITests: XCTestCase {
         app.launchArguments = ["-sheepOffline", "-sheepFastTimers"] + args
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 15))
-        dismissSystemAlerts(timeout: firstLaunch ? 6 : 2)
+        dismissSystemAlerts(timeout: firstLaunch ? 8 : 2)
     }
 
-    /// Notification permission (first launch) or any other springboard alert.
-    /// iOS 27 alerts don't always surface as `alerts`, so look for the buttons themselves.
+    /// Notification permission (first launch) or any other system alert.
+    /// iOS 27 puts Allow on the app as often as on SpringBoard; it is not always an interruption.
     private func dismissSystemAlerts(timeout: TimeInterval) {
-        let buttons = [springboard.buttons["Allow"], springboard.buttons["Open"]]
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            for button in buttons where button.exists {
-                button.tap()
-                _ = button.waitForNonExistence(timeout: 5)
-                return
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        } while Date() < deadline
+        _ = SystemAlert.dismiss(app: app, springboard: springboard, timeout: timeout)
     }
 
     /// Scroll the Notebook to the end: the privacy footer must sit above the floating tab bar, not under it.

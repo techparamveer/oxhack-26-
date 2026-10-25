@@ -1,22 +1,129 @@
 import Foundation
 import UserNotifications
 
+/// Coalesces concurrent authorization attempts into one `requestAuthorization`.
+/// A second in-flight call on a fresh install (didFinishLaunching + `.task`, or
+/// `schedule` while the Allow sheet is up) resolves both off the one tap and
+/// leaves every later `add` failing with "Source is not authorized".
+final class AuthorizationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var inFlight: Task<Bool, Never>?
+    var request: @Sendable () async -> Bool
+
+    init(request: @escaping @Sendable () async -> Bool) {
+        self.request = request
+    }
+
+    func ensure() async -> Bool {
+        lock.lock()
+        if let inFlight {
+            lock.unlock()
+            return await inFlight.value
+        }
+        let task = Task { await self.request() }
+        inFlight = task
+        lock.unlock()
+        return await task.value
+    }
+
+    /// One `requestAuthorization`, invoked on the caller’s thread (a user gesture).
+    func start(center: UNUserNotificationCenter) {
+        lock.lock()
+        if inFlight != nil { lock.unlock(); return }
+        let state = CallbackWaiter()
+        inFlight = Task { await state.wait() }
+        lock.unlock()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            #if DEBUG
+            NSLog("[Notifications] requestAuthorization granted=\(granted) error=\(String(describing: error))")
+            #endif
+            state.resume(granted)
+        }
+    }
+
+    /// Tests only: drop the cached task so the next `ensure` runs `request` again.
+    func reset() {
+        lock.lock(); defer { lock.unlock() }
+        inFlight = nil
+    }
+}
+
+/// Bridges the callback-style `requestAuthorization` to async waiters.
+private final class CallbackWaiter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var value: Bool?
+
+    func resume(_ granted: Bool) {
+        lock.lock()
+        if let continuation {
+            self.continuation = nil
+            lock.unlock()
+            continuation.resume(returning: granted)
+        } else {
+            value = granted
+            lock.unlock()
+        }
+    }
+
+    func wait() async -> Bool {
+        await withCheckedContinuation { cont in
+            lock.lock()
+            if let value {
+                lock.unlock()
+                cont.resume(returning: value)
+            } else {
+                continuation = cont
+                lock.unlock()
+            }
+        }
+    }
+}
+
 /// Local notifications only (no push, no entitlements). Banners also show while the app is open.
 final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = NotificationService()
-    private let center = UNUserNotificationCenter.current()
+    private let center: UNUserNotificationCenter
+    private let authorization: AuthorizationGate
+
+    override init() {
+        let center = UNUserNotificationCenter.current()
+        self.center = center
+        authorization = AuthorizationGate { [center] in
+            await NotificationService.ask(center)
+        }
+        super.init()
+    }
+
+    private static func ask(_ center: UNUserNotificationCenter) async -> Bool {
+        let settings = await center.notificationSettings()
+        if settings.authorizationStatus == .denied { return false }
+        // Always call the API unless denied. iOS 27 can report Authorized while
+        // `add` still fails; skipping the call is what skipped the Allow sheet.
+        return await withCheckedContinuation { cont in
+            DispatchQueue.main.async {
+                center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+                    #if DEBUG
+                    NSLog("[Notifications] requestAuthorization granted=\(granted) error=\(String(describing: error))")
+                    #endif
+                    cont.resume(returning: granted)
+                }
+            }
+        }
+    }
 
     func configure() {
         center.delegate = self
     }
 
-    func requestAuthorization() async {
-        _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+    /// Starts the one Allow prompt on the caller’s thread (Home / Rest / Play start tap).
+    func requestAuthorizationSoon() {
+        authorization.start(center: center)
     }
 
-    /// Fire-and-forget prompt so the Allow sheet can appear in `didFinishLaunching`.
-    func requestAuthorizationSoon() {
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    /// Waits for the in-flight prompt (or returns the cached grant).
+    func requestAuthorization() async {
+        _ = await waitUntilAuthorized()
     }
 
     /// Latest schedule/cancel per id. `schedule` enqueues asynchronously (after the permission
@@ -49,31 +156,67 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate, @un
         let fireAt = Date().addingTimeInterval(max(1, seconds))
         let generation = bump(id)
         Task { [id, title, body] in
-            let settings = await self.center.notificationSettings()
-            if settings.authorizationStatus == .notDetermined {
-                await self.requestAuthorization()
+            // Never `add` while `.notDetermined`. On iOS 27 that rejection
+            // ("Source is not authorized") sticks until the simulator is erased,
+            // even after the user later taps Allow.
+            let granted = await self.waitUntilAuthorized()
+            #if DEBUG
+            NSLog("[Notifications] wait \(id) granted=\(granted)")
+            #endif
+            guard granted else {
+                #if DEBUG
+                NSLog("[Notifications] skip \(id): not authorized")
+                #endif
+                return
             }
+            // Let BulletinBoard finish writing the Allow tap. Adding in the same
+            // run loop as the callback poisons the source until the sim is erased.
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             if onlyIfMissing {
                 let pending = await self.center.pendingNotificationRequests()
                 if pending.contains(where: { $0.identifier == id }) { return }
             }
             guard self.isCurrent(id, generation) else { return }   // cancelled or replaced meanwhile
-            self.enqueue(id: id, title: title, body: body, after: max(1, fireAt.timeIntervalSinceNow))
+            self.enqueue(id: id, title: title, body: body, after: max(1, fireAt.timeIntervalSinceNow),
+                         generation: generation)
         }
     }
 
-    private func enqueue(id: String, title: String, body: String, after seconds: TimeInterval) {
+    /// Joins the one in-flight prompt started from a user gesture.
+    /// Do not trust `notificationSettings` as a skip — iOS 27 can report Authorized
+    /// while `add` still fails with "Source is not authorized".
+    private func waitUntilAuthorized() async -> Bool {
+        await authorization.ensure()
+    }
+
+    private func enqueue(id: String, title: String, body: String, after seconds: TimeInterval, generation: Int) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
         content.interruptionLevel = .active
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, seconds), repeats: false)
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        center.delegate = self   // Liquid Glass overlay windows can steal the weak delegate
         center.removePendingNotificationRequests(withIdentifiers: [id])
-        center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger)) { error in
+        add(request, id: id, generation: generation, attempt: 0)
+    }
+
+    private func add(_ request: UNNotificationRequest, id: String, generation: Int, attempt: Int) {
+        center.add(request) { [weak self] error in
             #if DEBUG
-            if let error { print("[Notifications] add \(id) failed: \(error.localizedDescription)") }
+            if let error {
+                NSLog("[Notifications] add \(id) failed (attempt \(attempt)): \(error.localizedDescription)")
+            } else {
+                NSLog("[Notifications] add \(id) ok")
+            }
             #endif
+            guard let self, let error, self.isCurrent(id, generation), attempt < 4,
+                  error.localizedDescription.contains("not authorized") else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                guard self.isCurrent(id, generation) else { return }
+                self.add(request, id: id, generation: generation, attempt: attempt + 1)
+            }
         }
     }
 

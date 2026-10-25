@@ -28,7 +28,9 @@ fi
 xcrun simctl boot "$SIM" 2>/dev/null || true
 xcrun simctl bootstatus "$SIM" -b >/dev/null
 
-# Notifications can't be pre-granted with `simctl privacy`; the test taps "Allow" on the alert.
+# iOS 27 rejects `simctl privacy grant notifications` and does not store the
+# Allow grant in TCC.db. The UI test taps Allow once (see SystemAlert).
+
 # Clean light appearance so screenshots are comparable run to run (the dark pass uses a launch hook).
 xcrun simctl ui "$SIM" appearance light 2>/dev/null || true
 xcrun simctl status_bar "$SIM" override --batteryState charged --batteryLevel 100 2>/dev/null || true
