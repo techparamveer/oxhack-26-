@@ -9,7 +9,7 @@
 | Platform | Native **SwiftUI**, iOS 17+, Xcode. Runs in Simulator and on a personal iPhone with a **free Apple ID** (no paid dev account). |
 | Modes | **Focus / Rest / Play** (+ Idle when no session). |
 | Blocking | **In-app web-view wrappers only.** No FamilyControls (needs paid account). Native apps are redirected into Sheep via an iOS **Shortcuts automation** ("When Instagram is opened → Open Sheep") using a `sheep://` deep link. |
-| Wrappers | **Instagram** (hide Reels + DMs by mode) and **YouTube** (hide Shorts). |
+| Wrappers | **Instagram** (hide Reels + Explore by mode; DMs stay open) and **YouTube** (hide Shorts). |
 | Gemini | Called directly from the app via REST. Key in a git-ignored `Secrets.xcconfig`. Must ship: **session planner** + **doom-scroll nudge**. Nice: end-of-session reflection. |
 | Notifications | Local notifications only (Pomodoro, overuse nudges). "Silence work notifications" = Sheep App Intent + user Shortcut that turns on an iOS Focus. |
 | Progress | XP = time well spent. Sheep grows wool per level; doom-scrolling sheds wool. Stored locally. |
@@ -69,10 +69,10 @@
 1. Home: sheep with current wool/level + **daily brief from memory**: "Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40. Lock in today." Tap **Focus**.
 2. Intake: 3 questions (What do you want to achieve? What will "done" look like? What usually distracts you?) → **Gemini returns a plan + checklist**.
 3. Pomodoro starts (demo: 25 min, with a dev "fast" toggle = 1 min).
-4. Open **Instagram wrapper** → Reels tab and DMs are hidden/blocked with a sheep overlay ("Not now — you're focusing on *X*").
+4. Open **Instagram wrapper** → Reels and Explore are hidden/blocked with a sheep overlay ("Not now — you're focusing on *X*"). DMs, stories, the following feed, search and profiles stay open.
 5. Scroll the feed for a while → **doom-scroll intervention**: Gemini-written nudge quoting the user's goal, sheep animation.
 6. Tick checklist → **Congrats** screen, XP awarded, wool grows.
-7. Switch to **Rest** → same Instagram wrapper, DMs now open; pick activity "Netflix" → overuse notification fires (demo threshold).
+7. Switch to **Rest** → same Instagram wrapper, Reels and Explore come back; pick activity "Netflix" → overuse notification fires (demo threshold).
 8. Show **Play** briefly: work apps marked muted, XP for play time.
 
 ## Architecture
@@ -120,7 +120,8 @@ Sheep/
 |---|---|---|---|---|
 | Instagram feed | allowed, scroll-monitored (strict) | allowed, monitored (lenient) | allowed | allowed |
 | Instagram Reels `/reels/`, `/reel/` | **blocked** | allowed, monitored | allowed | allowed |
-| Instagram DMs `/direct/` | **blocked** | allowed | allowed | allowed |
+| Instagram Explore `/explore/` | **blocked** | allowed | allowed | allowed |
+| Instagram DMs `/direct/` | allowed | allowed | allowed | allowed |
 | YouTube Shorts `/shorts/` | **blocked** | allowed, monitored | allowed | allowed |
 | Work apps (Teams/Mail — display only) | allowed | muted* | muted* | — |
 
@@ -130,7 +131,7 @@ Sheep/
 - `WKWebView` with `customUserAgent` = mobile Safari UA (Instagram/YouTube serve proper mobile web).
 - Persistent `WKWebsiteDataStore.default()` so logins survive.
 - **Blocking by URL, not by fragile CSS**: Instagram/YouTube are SPAs, so `inject.js` wraps `history.pushState/replaceState` + listens to `popstate`, and posts `{type:"nav", path}` to native. Native checks `Policy.isAllowed`; if blocked → show overlay + `history.back()`. Also enforce in `decidePolicyFor navigationAction` for full loads.
-- **Hide entry points** with injected CSS from native per mode: e.g. `a[href*="/reels/"], a[href^="/direct/"] { display:none !important }`, `a[href*="/shorts"]`. Re-inject when mode changes (`evaluateJavaScript`).
+- **Hide entry points** with injected CSS from native per mode: e.g. `a[href*="/reels/"], a[href*="/explore/"] { display:none !important }`, `a[href*="/shorts"]`. Do not hide a parent nav (the inbox paper-plane is `/direct/`). Re-inject when mode changes (`evaluateJavaScript`).
 - **Scroll reporting**: `inject.js` accumulates scroll distance + active seconds, posts `{type:"scroll", px, activeSec, path}` every 5 s.
 - `ScrollMonitor`: if continuous active scrolling ≥ threshold (Focus 30 s demo / 3 min real; Rest 2 min demo / 30 min real) → trigger intervention (once per cooldown).
 

@@ -90,8 +90,10 @@ final class PolicyTests: XCTestCase {
             (.instagram, "/explore/", .focus, false),
             (.instagram, "/reels/", .focus, false),
             (.instagram, "/reel/Cx1/", .focus, false),
-            (.instagram, "/direct/inbox/", .focus, false),
-            (.instagram, "/direct/t/123", .focus, false),
+            (.instagram, "/direct/inbox/", .focus, true),
+            (.instagram, "/direct/t/123", .focus, true),
+            (.instagram, "/stories/someone/123/", .focus, true),
+            (.instagram, "/alice/", .focus, true),
             (.youtube, "/", .focus, true),
             (.youtube, "/watch?v=abc", .focus, true),
             (.youtube, "/shorts/abc", .focus, false),
@@ -112,7 +114,7 @@ final class PolicyTests: XCTestCase {
     }
 
     func testBlockedSections() {
-        XCTAssertEqual(Policy.blockedSections(app: .instagram, mode: .focus, defaults: defaults), [.reels, .explore, .dms])
+        XCTAssertEqual(Policy.blockedSections(app: .instagram, mode: .focus, defaults: defaults), [.reels, .explore])
         XCTAssertEqual(Policy.blockedSections(app: .youtube, mode: .focus, defaults: defaults), [.shorts])
         for mode in [Mode.rest, .play, .idle] {
             for app in WrappedApp.allCases { XCTAssertTrue(Policy.blockedSections(app: app, mode: mode, defaults: defaults).isEmpty) }
@@ -127,16 +129,17 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(Policy.blockedKey(for: .play), "sheep.blockedInPlay")
         XCTAssertNil(Policy.blockedKey(for: .idle))
 
-        XCTAssertEqual(Policy.defaultBlocked(in: .focus), [.reels, .dms, .shorts, .explore])
+        XCTAssertEqual(Policy.defaultBlocked(in: .focus), [.reels, .shorts, .explore])
         XCTAssertTrue(Policy.defaultBlocked(in: .rest).isEmpty)
         XCTAssertTrue(Policy.defaultBlocked(in: .play).isEmpty)
         XCTAssertTrue(Policy.defaultBlocked(in: .idle).isEmpty)
 
-        XCTAssertEqual(Policy.blockedSections(in: .focus, defaults: defaults), [.reels, .dms, .shorts, .explore])
+        XCTAssertEqual(Policy.blockedSections(in: .focus, defaults: defaults), [.reels, .shorts, .explore])
         XCTAssertTrue(Policy.blockedSections(in: .rest, defaults: defaults).isEmpty)
         XCTAssertTrue(Policy.blockedSections(in: .play, defaults: defaults).isEmpty)
         XCTAssertTrue(Policy.blockedSections(in: .idle, defaults: defaults).isEmpty)
-        XCTAssertFalse(Policy.isAllowed(app: .instagram, path: "/direct/inbox/", mode: .focus, defaults: defaults))
+        XCTAssertTrue(Policy.isAllowed(app: .instagram, path: "/direct/inbox/", mode: .focus, defaults: defaults),
+                      "Focus keeps DMs open unless the user ticks them")
         XCTAssertTrue(Policy.isAllowed(app: .instagram, path: "/direct/inbox/", mode: .rest, defaults: defaults),
                       "Rest keeps DMs open")
     }
@@ -211,12 +214,15 @@ final class PolicyTests: XCTestCase {
     func testFocusCSSHidesEntryPoints() {
         let ig = Policy.hidingCSS(app: .instagram, mode: .focus, defaults: defaults)
         XCTAssertTrue(ig.contains(#"a[href*="/reels/"]"#))
-        XCTAssertTrue(ig.contains(#"a[href^="/direct/"]"#))
-        XCTAssertTrue(ig.contains(#"a[href*="/direct/"]"#))
         XCTAssertTrue(ig.contains(#"a[href^="/explore/"]"#))
         XCTAssertTrue(ig.contains(#"a[href*="/explore/"]"#))
         XCTAssertTrue(ig.contains("display: none !important"))
         XCTAssertFalse(ig.contains("shorts"))
+        XCTAssertFalse(ig.contains("/direct/"), "inbox paper-plane must stay visible in Focus")
+        for sel in Policy.hidingSelectors(app: .instagram, section: .reels)
+            + Policy.hidingSelectors(app: .instagram, section: .explore) {
+            XCTAssertFalse(sel.contains("direct"), "Reels/Explore CSS must not match \(sel)")
+        }
 
         let restIG = Policy.hidingCSS(app: .instagram, mode: .rest, defaults: defaults)
         XCTAssertEqual(restIG, "", "Rest hides nothing by default")
@@ -244,7 +250,7 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(AppsCaption.wrapped(app: .instagram, mode: .play, isAllowed: allowed), "Everything open in Play")
         XCTAssertEqual(AppsCaption.wrapped(app: .youtube, mode: .play, isAllowed: allowed), "Everything open in Play")
         XCTAssertEqual(AppsCaption.wrapped(app: .instagram, mode: .focus, isAllowed: allowed),
-                       "Reels, Explore and DMs hidden")
+                       "Reels and Explore hidden")
     }
 
     func testBlockedCopyReadsNaturally() {

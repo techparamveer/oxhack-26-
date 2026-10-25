@@ -9,7 +9,7 @@ You are building **Sheep**, a native iOS screen-time app, for the OxHack '26 hac
 **Read first:** `docs/MVP_PLAN.md` (architecture, mode policy, build order, demo script) and `docs/GEMINI_PROMPTS.md` (every Gemini prompt, JSON schema and the event log format). Treat both as the spec. If something here conflicts, this prompt wins.
 
 ## Product in one paragraph
-Sheep gives your time three modes — **Focus, Rest, Play** — and makes the same apps behave differently in each. Instagram and YouTube live inside Sheep as **web-view wrappers**: in Focus, Reels, Shorts and DMs are blocked; in Rest, DMs open up and only overuse is nudged. Focus sessions start with 3 questions, Gemini turns them into a plan + checklist, a Pomodoro runs, and finishing earns XP that grows your sheep's wool. Gemini also writes **doom-scroll interventions** inside the wrappers. Sheep has **long-term memory** (Instinct-style markdown files consolidated by Gemini) so it can say *"Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40 — lock in today."*
+Sheep gives your time three modes — **Focus, Rest, Play** — and makes the same apps behave differently in each. Instagram and YouTube live inside Sheep as **web-view wrappers**: in Focus, Reels, Explore and Shorts are blocked while DMs, stories, the following feed, search and profiles stay usable; in Rest everything opens and only overuse is nudged. Focus sessions start with 3 questions, Gemini turns them into a plan + checklist, a Pomodoro runs, and finishing earns XP that grows your sheep's wool. Gemini also writes **doom-scroll interventions** inside the wrappers. Sheep has **long-term memory** (Instinct-style markdown files consolidated by Gemini) so it can say *"Yesterday you did 1 of 3 Pomodoros before Reels got you at 22:40 — lock in today."*
 
 ## Hard constraints
 - **SwiftUI, iOS 17+, Swift 5.9+, `@Observable`.** No third-party packages unless unavoidable.
@@ -72,7 +72,7 @@ enum Theme {
 10. **Polish** — audit every screen against the Design section (remove anything non-essential, check Nunito weights render, dark mode), light haptics, empty states, minimal monochrome sheep app icon.
 
 ## Acceptance checks (run the demo script from MVP_PLAN end-to-end)
-- With "Seed yesterday" + fast timers, a fresh install can: show a daily brief referencing yesterday → complete a Focus session with a Gemini plan → see Reels/DMs blocked in the Instagram wrapper → get a memory-aware nudge after scrolling → finish with congrats + XP + "What Sheep learned" → switch to Rest and open DMs → get a Rest overuse notification.
+- With "Seed yesterday" + fast timers, a fresh install can: show a daily brief referencing yesterday → complete a Focus session with a Gemini plan → see Reels/Explore blocked (DMs still open) in the Instagram wrapper → get a memory-aware nudge after scrolling → finish with congrats + XP + "What Sheep learned" → switch to Rest (Reels come back) → get a Rest overuse notification.
 - Turning Wi-Fi off still completes the whole flow using fallbacks.
 - No compiler warnings about missing entitlements; app installs with a free Personal Team.
 - `Secrets.xcconfig` is not tracked by git.

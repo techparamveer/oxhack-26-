@@ -9,7 +9,7 @@ import Foundation
 /// | Instagram feed       | allowed | allowed | allowed | allowed |
 /// | Instagram Reels      | blocked | allowed | allowed | allowed |
 /// | Instagram Explore    | blocked | allowed | allowed | allowed |
-/// | Instagram DMs        | blocked | allowed | allowed | allowed |
+/// | Instagram DMs        | allowed | allowed | allowed | allowed |
 /// | YouTube Shorts       | blocked | allowed | allowed | allowed |
 ///
 /// Read only via `blockedSections(in:)`. Blocking is by URL path (robust); `hidingCSS` only hides
@@ -59,7 +59,7 @@ enum Policy {
 
     static func defaultBlocked(in mode: Mode) -> Set<AppSection> {
         switch mode {
-        case .focus: [.reels, .dms, .shorts, .explore]
+        case .focus: [.reels, .shorts, .explore]
         case .rest, .play, .idle: []
         }
     }
@@ -105,6 +105,7 @@ enum Policy {
     static func hidingSelectors(app: WrappedApp, section: AppSection) -> [String] {
         switch (app, section) {
         case (.instagram, .reels):
+            // Href-only: do not hide a parent nav, or the paper-plane inbox (`/direct/`) goes with it.
             [#"a[href*="/reels/"]"#, #"a[href$="/reels"]"#, #"a[href^="/reel/"]"#, #"a[href*="/reel/"]"#]
         case (.instagram, .explore):
             [#"a[href^="/explore/"]"#, #"a[href*="/explore/"]"#]

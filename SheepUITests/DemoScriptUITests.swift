@@ -79,7 +79,7 @@ final class DemoScriptUITests: XCTestCase {
         XCTAssertTrue(text(containing: "Dissertation").exists, "Session should be titled after the goal")
         shot("03-focus-session-plan")
 
-        // 3. Instagram wrapper → Reels and DMs blocked with "Not now — you're focusing on…".
+        // 3. Instagram wrapper → Reels blocked; DMs stay open (SocialLite-style Focus).
         launch(["-sheepWrapperPath", "/reels/", "-sheepOpenWrapper", "instagram"])
         waitFor(element("blocked.title"), timeout: 20, "Blocked overlay on /reels/")
         let focusing = text(containing: "focusing on")
@@ -87,13 +87,15 @@ final class DemoScriptUITests: XCTestCase {
                       "Blocked overlay should name the goal: \(focusing.label)")
         XCTAssertTrue(text(containing: "reels are off").exists)
         shot("04-instagram-reels-blocked")
-
-        launch(["-sheepWrapperPath", "/direct/inbox/", "-sheepOpenWrapper", "instagram"])
-        waitFor(element("blocked.title"), timeout: 20, "Blocked overlay on /direct/inbox/")
-        XCTAssertTrue(text(containing: "messages are off").exists)
-        shot("05-instagram-dms-blocked")
         tap("blocked.backToFocus")
         waitFor(element("focus.session.finish"), "Back to focus from the blocked overlay")
+
+        launch(["-sheepWrapperPath", "/direct/inbox/", "-sheepOpenWrapper", "instagram"])
+        waitFor(element("wrapper.close"), timeout: 20, "Instagram wrapper on /direct/inbox/")
+        XCTAssertFalse(element("blocked.title").waitForExistence(timeout: 4), "DMs must stay open in Focus")
+        shot("05-instagram-dms-open")
+        tap("wrapper.close")
+        waitFor(element("focus.session.finish"), "Back to focus from open DMs")
 
         // 4. Scrolling the feed → doom-scroll nudge quoting the goal → primary → back in focus.
         launch(["-sheepOpenWrapper", "instagram", "-sheepSimulateScroll", "90"])
@@ -124,7 +126,7 @@ final class DemoScriptUITests: XCTestCase {
         shot("09-congrats-xp-learned")
         tap("focus.congrats.done")
 
-        // 6. Rest: DMs open in the wrapper (no block), Netflix → overuse notification.
+        // 6. Rest: DMs still open (same as Focus); Netflix → overuse notification.
         launch(["-sheepWrapperPath", "/direct/inbox/"])
         tap("home.pill.rest")
         tap("home.primary")

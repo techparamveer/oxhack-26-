@@ -79,7 +79,7 @@ struct StartModeIntent: AppIntent {
 /// "Open Instagram in Sheep" — the action for the "Instagram is opened" automation.
 struct OpenWrapperIntent: AppIntent {
     static let title: LocalizedStringResource = "Open App in Sheep"
-    static let description: IntentDescription = IntentDescription("Opens Instagram or YouTube inside Sheep, where Reels, DMs and Shorts follow your mode.")
+    static let description: IntentDescription = IntentDescription("Opens Instagram or YouTube inside Sheep, where Reels, Explore and Shorts follow your mode.")
     static let openAppWhenRun: Bool = true
 
     @Parameter(title: "App", default: .instagram)

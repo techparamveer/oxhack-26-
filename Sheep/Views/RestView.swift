@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Rest: pick an activity + time limit → wall-clock timer, wrappers with DMs open, work apps muted.
+/// Rest: pick an activity + time limit → wall-clock timer, wrappers with everything open, work apps muted.
 /// A local notification (GEMINI_PROMPTS §4) fires when the limit is exceeded.
 struct RestView: View {
     @Environment(AppState.self) private var state
@@ -141,7 +141,7 @@ struct RestView: View {
     }
 }
 
-/// "instagram · youtube" plain buttons + "DMs are open in rest".
+/// "instagram · youtube" plain buttons + "Everything is open".
 private struct RestWrappers: View {
     @Environment(Router.self) private var router
 
@@ -161,7 +161,7 @@ private struct RestWrappers: View {
                     .accessibilityIdentifier("rest.wrapper.\(app.rawValue)")
                 }
             }
-            Caption("DMs are open in rest")
+            Caption("Everything is open")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
