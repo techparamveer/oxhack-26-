@@ -7,8 +7,11 @@ import UIKit
 final class SheepAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Delegate only — do not request authorization here. XCTest (and a cold
+        // launch) can call this while the process is still suspended / before a
+        // window exists; that prompt is what leaves `add` failing with
+        // "Source is not authorized" after the user taps Allow.
         NotificationService.shared.configure()
-        NotificationService.shared.requestAuthorizationSoon()
         return true
     }
 }
@@ -34,9 +37,9 @@ struct SheepApp: App {
                 .consumesIntentRoutes(router: router, state: state)
                 .debugLaunchHooks(state: state, router: router)   // DEBUG-only launch args (Sheep/Debug)
                 .task {
-                    // Rollover even while the permission alert (asked once, in `SheepAppDelegate`)
-                    // keeps the scene `.inactive`. A second concurrent request raced the first on a
-                    // fresh install and left the app "not authorized" despite Allow.
+                    // Rollover even while the Allow sheet (asked once, on first `.active`)
+                    // keeps the scene `.inactive`. Do not request permission here — a
+                    // second in-flight `requestAuthorization` leaves `add` unauthorized.
                     DailyRollover.handleActive()
                 }
                 .onChange(of: scenePhase, initial: true) { _, phase in

@@ -112,6 +112,9 @@ struct HomeView: View {
     }
 
     private func start() {   // PrimaryButton plays the haptic
+        // User gesture — iOS 27 will actually present the Allow sheet here.
+        // The one in-flight request is started once; later taps no-op.
+        NotificationService.shared.requestAuthorizationSoon()
         // Switching between Rest and Play (or to Focus) ends the running one cleanly first.
         router.push(HomePrimary.apply(plan, state: state))
     }

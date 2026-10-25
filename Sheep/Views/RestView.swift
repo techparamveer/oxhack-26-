@@ -69,6 +69,9 @@ struct RestView: View {
         .safeAreaInset(edge: .bottom) {
             PrimaryButton(title: "Start rest", accent: accent, icon: "play.fill") {
                 customFocused = false
+                // User gesture — iOS 27 presents Allow here; `schedule` waits for the grant
+                // before `add` so we never poison the source with "not authorized".
+                NotificationService.shared.requestAuthorizationSoon()
                 RestController.startRest(activity: chosenActivity, limitMinutes: limit, state: state)
             }
             .accessibilityIdentifier("rest.start")
